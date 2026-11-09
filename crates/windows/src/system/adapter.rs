@@ -3,7 +3,7 @@ use agent_desktop_core::{
     DismissNotificationRequest, DisplayInfo, ImageBuffer, InteractionLease, InteractionPolicy,
     KeyCombo, NotificationActionRequest, NotificationFilter, NotificationInfo, ObservationOps,
     OperationReport, PermissionReport, ProcessIdentity, ScreenshotTarget, SignalBaseline,
-    SignalFilter, SnapshotSurface, SystemOps, WindowFilter, WindowInfo, WindowOp,
+    SignalFilter, SnapshotSurface, SurfaceOpening, SystemOps, WindowFilter, WindowInfo, WindowOp,
     system::launch_options::LaunchOptions, system::process_state::ProcessState,
 };
 
@@ -140,7 +140,7 @@ impl SystemOps for WindowsAdapter {
         surface: SnapshotSurface,
         policy: InteractionPolicy,
         lease: &InteractionLease,
-    ) -> Result<WindowInfo, AdapterError> {
+    ) -> Result<SurfaceOpening, AdapterError> {
         crate::system::shell::shell_surface_open::open_surface(surface, policy, lease.deadline())
     }
 
@@ -341,7 +341,7 @@ impl SystemOps for WindowsAdapter {
         &self,
         request: DismissAllNotificationsRequest<'_>,
         _lease: &InteractionLease,
-    ) -> Result<(Vec<NotificationInfo>, Vec<String>), AdapterError> {
+    ) -> Result<(Vec<NotificationInfo>, Vec<AdapterError>), AdapterError> {
         crate::notifications::actions::dismiss_all(
             request.app_filter,
             request.policy,
