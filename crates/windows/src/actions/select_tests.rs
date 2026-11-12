@@ -1,10 +1,87 @@
 use super::{
-    SELECT_LABEL, SelectOps, SelectPlan, push_order, resolve_select_verification, select_judged_for,
+    SELECT_LABEL, SelectOps, SelectPlan, find_after_expand, push_order,
+    resolve_select_verification, select_judged_for,
 };
 use crate::actions::chain::DeliveryOutcome;
 use crate::system::fixture::test_time::deadline;
 use agent_desktop_core::{ActionStepOutcome, AdapterError, ErrorCode};
 use std::cell::Cell;
+use std::time::Duration;
+
+/// Chromium builds a `<select>`'s items only after its popup opens, so the
+/// first searches after `Expand` find nothing. A just-expanded container
+/// keeps searching until the items appear.
+#[test]
+fn a_just_expanded_container_keeps_searching_until_its_items_appear() {
+    let calls = Cell::new(0u8);
+    let mut find_once = || {
+        calls.set(calls.get() + 1);
+        Ok(calls.get() == 3)
+    };
+
+    let found = find_after_expand(
+        true,
+        deadline(5_000),
+        Duration::from_secs(2),
+        &mut find_once,
+    );
+
+    assert!(found.expect("search succeeds"));
+    assert_eq!(calls.get(), 3);
+}
+
+#[test]
+fn a_container_that_was_not_expanded_searches_once() {
+    let calls = Cell::new(0u8);
+    let mut find_once = || {
+        calls.set(calls.get() + 1);
+        Ok(false)
+    };
+
+    let found = find_after_expand(
+        false,
+        deadline(5_000),
+        Duration::from_secs(2),
+        &mut find_once,
+    );
+
+    assert!(!found.expect("search succeeds"));
+    assert_eq!(calls.get(), 1);
+}
+
+#[test]
+fn an_expanded_container_stops_searching_when_the_settle_window_ends() {
+    let mut find_once = || Ok(false);
+
+    let found = find_after_expand(
+        true,
+        deadline(5_000),
+        Duration::from_millis(80),
+        &mut find_once,
+    );
+
+    assert!(!found.expect("search succeeds"));
+}
+
+#[test]
+fn a_failed_search_is_returned_without_retrying() {
+    let calls = Cell::new(0u8);
+    let mut find_once = || {
+        calls.set(calls.get() + 1);
+        Err(AdapterError::new(ErrorCode::Timeout, "budget"))
+    };
+
+    let error = find_after_expand(
+        true,
+        deadline(5_000),
+        Duration::from_secs(2),
+        &mut find_once,
+    )
+    .expect_err("search error propagates");
+
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert_eq!(calls.get(), 1);
+}
 
 fn plan(self_match: bool, needs_expand: bool, value_chars: usize) -> SelectPlan {
     SelectPlan {

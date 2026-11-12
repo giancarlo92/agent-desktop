@@ -19,6 +19,10 @@ pub(crate) const SELECT_LABEL: &str = "SelectionItemPattern.Select";
 
 const VERIFY_TIMEOUT: Duration = Duration::from_millis(600);
 const POLL_SLICE: Duration = Duration::from_millis(25);
+/// How long a just-expanded container gets to publish its items. Chromium
+/// builds a `<select>`'s option list only when the popup first opens, so a
+/// search made the instant `Expand` returns finds nothing on a fresh page.
+const EXPAND_SETTLE: Duration = Duration::from_millis(1_000);
 
 /// Pure verification precedence: container Value outranks `is_selected` when
 /// the gate produced a comparison; withheld / absent Value falls back.
@@ -61,9 +65,9 @@ pub(crate) struct SelectOps<'a> {
 #[cfg(target_os = "windows")]
 mod imp {
     use super::{
-        ActionStep, AdapterError, Cell, Deadline, DeliveryOutcome, ErrorCode, Instant, POLL_SLICE,
-        RefCell, SELECT_LABEL, SelectOps, SelectPlan, UIAElement, VERIFY_TIMEOUT, build_step,
-        resolve_select_verification,
+        ActionStep, AdapterError, Cell, Deadline, DeliveryOutcome, EXPAND_SETTLE, ErrorCode,
+        Instant, POLL_SLICE, RefCell, SELECT_LABEL, SelectOps, SelectPlan, UIAElement,
+        VERIFY_TIMEOUT, build_step, resolve_select_verification,
     };
     use crate::actions::chain::{after_delivery, capped_verification_end};
     use crate::actions::disclosure::{EXPAND_LABEL, ExpandKind};
@@ -98,14 +102,17 @@ mod imp {
         };
         let found_holder = RefCell::new(self_match.then(|| element.clone()));
         let mut find = || {
-            let prior = found_holder.borrow().clone();
-            match find_named_selection_item(element, value, deadline, prior.as_ref())? {
-                Some(found) => {
-                    *found_holder.borrow_mut() = Some(found);
-                    Ok(true)
+            let mut find_once = || {
+                let prior = found_holder.borrow().clone();
+                match find_named_selection_item(element, value, deadline, prior.as_ref())? {
+                    Some(found) => {
+                        *found_holder.borrow_mut() = Some(found);
+                        Ok(true)
+                    }
+                    None => Ok(false),
                 }
-                None => Ok(false),
-            }
+            };
+            find_after_expand(expanded.get(), deadline, EXPAND_SETTLE, &mut find_once)
         };
         let mut realize = || {
             deadline.ensure_remaining()?;
@@ -141,6 +148,27 @@ mod imp {
                 select_item: &mut select_item,
             },
         )
+    }
+
+    /// Searches once, and keeps searching for up to `settle` when the
+    /// container was just expanded, so items a provider publishes only after
+    /// its popup opens are found instead of reported missing.
+    pub(crate) fn find_after_expand(
+        expanded: bool,
+        deadline: Deadline,
+        settle: std::time::Duration,
+        find_once: &mut dyn FnMut() -> Result<bool, AdapterError>,
+    ) -> Result<bool, AdapterError> {
+        let settle_end = Instant::now() + settle;
+        loop {
+            if find_once()? {
+                return Ok(true);
+            }
+            if !expanded || Instant::now() >= settle_end {
+                return Ok(false);
+            }
+            std::thread::sleep(deadline.remaining_slice(POLL_SLICE)?);
+        }
     }
 
     pub(crate) fn select_judged_for(
@@ -312,7 +340,7 @@ mod imp {
 pub(crate) use imp::select_steps;
 
 #[cfg(all(test, target_os = "windows"))]
-pub(crate) use imp::select_judged_for;
+pub(crate) use imp::{find_after_expand, select_judged_for};
 
 #[cfg(all(test, target_os = "windows"))]
 #[path = "select_tests.rs"]
