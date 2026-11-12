@@ -30,6 +30,7 @@ pub(crate) fn policy_for(cmd: &Commands) -> PermissionNeed {
         | Commands::Find(_)
         | Commands::ListSurfaces(_)
         | Commands::Wait(_)
+        | Commands::Record(_)
         | Commands::ListNotifications(_) => Accessibility,
 
         Commands::Screenshot(a) if a.scope.app.is_some() || a.scope.window_id.is_some() => {
@@ -242,6 +243,7 @@ fn validate_args(cmd: &Commands) -> Result<(), AppError> {
         | Commands::ClipboardGet(_)
         | Commands::ClipboardSet(_)
         | Commands::ClipboardClear
+        | Commands::Record(_)
         | Commands::Status
         | Commands::Permissions(_)
         | Commands::Version

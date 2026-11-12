@@ -20,6 +20,7 @@ use crate::cli_args::{
         DismissAllNotificationsCliArgs, DismissNotificationCliArgs, ListNotificationsCliArgs,
         NotificationActionCliArgs,
     },
+    record::RecordArgs,
     sandbox::SandboxArgs,
     session::SessionArgs,
     skills::SkillsArgs,
@@ -149,6 +150,10 @@ pub(crate) enum Commands {
     ClipboardClear,
     #[command(about = "Wait for time (ms), element presence, text, or window appearance")]
     Wait(WaitArgs),
+    #[command(
+        about = "Record the user's own clicks, typing, key presses and scrolls to a JSON Lines file until stopped"
+    )]
+    Record(RecordArgs),
     #[command(about = "Show adapter health, platform info, and permission state")]
     Status,
     #[command(
@@ -245,6 +250,7 @@ impl Commands {
             Self::ClipboardSet(_) => CommandMetadata::new("clipboard-set", false),
             Self::ClipboardClear => CommandMetadata::new("clipboard-clear", false),
             Self::Wait(_) => CommandMetadata::new("wait", false),
+            Self::Record(_) => CommandMetadata::new("record", false),
             Self::Status => CommandMetadata::new("status", false),
             Self::Permissions(_) => CommandMetadata::new("permissions", false),
             Self::Version => CommandMetadata::new("version", false),
@@ -333,6 +339,7 @@ impl Commands {
             | Self::ListSurfaces(_)
             | Self::ListNotifications(_)
             | Self::Wait(_)
+            | Self::Record(_)
             | Self::Status
             | Self::Version
             | Self::Skills(_) => false,

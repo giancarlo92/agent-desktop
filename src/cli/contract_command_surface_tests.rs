@@ -81,6 +81,8 @@ const SHARED_REF_ACTION_TESTS: &[&str] = &[
 
 const BINARY_CONTRACT_TESTS: &[&str] = &["batch", "permissions", "sandbox", "version"];
 
+const RECORDING_COMMANDS: &[&str] = &["record"];
+
 const ADAPTER_PASSTHROUGH_COMMANDS: &[&str] = &[
     "clipboard-clear",
     "clipboard-get",
@@ -161,7 +163,7 @@ fn macos_capability_count_includes_restored_notifications() {
     let commands = cli_command_names();
     assert_eq!(
         commands.len(),
-        61,
+        62,
         "the published CLI command count changed; update capability documentation"
     );
 }
@@ -232,6 +234,7 @@ fn coverage_names() -> BTreeSet<&'static str> {
         .chain(SHARED_REF_ACTION_TESTS)
         .chain(BINARY_CONTRACT_TESTS)
         .chain(ADAPTER_PASSTHROUGH_COMMANDS)
+        .chain(RECORDING_COMMANDS)
         .copied()
         .collect()
 }

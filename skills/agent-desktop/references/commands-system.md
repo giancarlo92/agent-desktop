@@ -148,6 +148,16 @@ The platform skills state the event and menu wait rules that differ by OS.
 
 A `TIMEOUT` from `wait` carries `details.kind: "wait_timeout"`, `last_observed` or `last_error`, and `baseline_counts` for events.
 
+## record
+
+```bash
+agent-desktop record --out demo.jsonl --window-id w-123 --stop-file stop.flag
+```
+
+Records what a person does, not what you do: it observes their clicks, typing, combo box choices, key presses and scrolls and streams one JSON line per action to `--out`. Windows only; elsewhere it returns `PLATFORM_NOT_SUPPORTED`. Scope it with `--app` or `--window-id`, never both. It stops when `--stop-file` appears, after `--max-duration-ms` (default 600000, at most 3600000) or on Ctrl+C. Ask the person to start only after the file holds a `recording_ready` line. Input Windows marks as injected, including your own actions, is ignored unless `--include-injected`. It cannot run inside `batch`.
+
+Each action line carries `kind`, `t_ms`, `window` and, when UI Automation answers, `element` (`role`, `name`, `native_id`), `ancestors` and `match_count`. Replay it with ordinary commands: find each `element` by `native_id` (or `role` plus `name`) inside the recorded window, then `set-value` a `type` line's `value`, `select` a `select` line's `value`, `check`/`uncheck` a `click` from `state_after.checked`, `click` other clicks, `press` a `press` line's `keys` and `scroll` a `scroll` line. A `type` line with `secure: true` carries no text; ask for the secret. Skip a `click` whose `element.role` is still a container (`group`, `document`, `pane`). A `match_count` above 1 needs `ancestors` to disambiguate.
+
 ## batch
 
 ```bash

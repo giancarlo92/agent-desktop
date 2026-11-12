@@ -1,7 +1,11 @@
 use crate::{
     AdapterError, ClipboardContent, ClipboardFormat, Deadline, DragParams, InteractionLease,
-    KeyCombo, MouseEvent, OperationReport,
+    KeyCombo, MouseEvent, OperationReport, RecordRequest, RecordSummary, RecordedEvent,
 };
+
+/// Receives each event a `record` session observes, in order. An error stops
+/// the session and is returned from `record_input`.
+pub type RecordSink<'a> = dyn FnMut(RecordedEvent) -> Result<(), AdapterError> + 'a;
 
 /// `get_clipboard`/`set_clipboard` were removed pre-1.0 in favor of
 /// `get_clipboard_content`/`set_clipboard_content`; the C ABI
@@ -72,6 +76,17 @@ pub trait InputOps: Send + Sync {
         _lease: &InteractionLease,
     ) -> Result<OperationReport, AdapterError> {
         Err(AdapterError::not_supported("set_clipboard_content"))
+    }
+
+    /// Observes the user's own clicks, typing, key presses and scrolls until
+    /// the request's stop condition, passing each one to `sink` as it
+    /// happens. It never sends input and never takes the interaction lease.
+    fn record_input(
+        &self,
+        _request: &RecordRequest,
+        _sink: &mut RecordSink<'_>,
+    ) -> Result<RecordSummary, AdapterError> {
+        Err(AdapterError::not_supported("record_input"))
     }
 }
 

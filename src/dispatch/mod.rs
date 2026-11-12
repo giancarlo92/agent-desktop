@@ -125,6 +125,7 @@ fn dispatch_command(
         Commands::ClipboardSet(args) => clipboard::set(args, adapter),
         Commands::ClipboardClear => commands::clipboard_clear::execute(adapter),
         Commands::Wait(args) => system::wait(args, adapter, context),
+        Commands::Record(args) => system::record(args, adapter),
         Commands::Status => {
             commands::status::execute_with_report_with_context(adapter, permission_report, context)
         }

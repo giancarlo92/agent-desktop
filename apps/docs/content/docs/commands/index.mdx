@@ -1,10 +1,10 @@
 ---
 title: Commands
 navTitle: All commands
-description: All 61 agent-desktop commands by group, with a one-line description and a link to each command's reference entry.
+description: All 62 agent-desktop commands by group, with a one-line description and a link to each command's reference entry.
 ---
 
-agent-desktop has 61 commands in 12 groups. Every command prints one JSON envelope with `version`, `ok`, `command`, and either `data` or `error`; [JSON output](/desktop/json-output) defines it.
+agent-desktop has 62 commands in 13 groups. Every command prints one JSON envelope with `version`, `ok`, `command`, and either `data` or `error`; [JSON output](/desktop/json-output) defines it.
 
 ```bash
 agent-desktop --help               # list every command
@@ -80,6 +80,8 @@ agent-desktop skills get desktop   # the agent usage guide compiled into the bin
     <tr><td><a href="/desktop/commands/clipboard#clipboard-clear"><code>clipboard-clear</code></a></td><td>Clear the clipboard.</td></tr>
     <tr><th colSpan="2">Wait</th></tr>
     <tr><td><a href="/desktop/commands/wait#wait"><code>wait</code></a></td><td>Block until a time, element, window, text, menu, event, or notification condition holds.</td></tr>
+    <tr><th colSpan="2">Recording</th></tr>
+    <tr><td><a href="/desktop/commands/record#record"><code>record</code></a></td><td>Record the user's own clicks, typing, key presses, and scrolls to a JSON Lines file. Windows only.</td></tr>
     <tr><th colSpan="2">System</th></tr>
     <tr><td><a href="/desktop/commands/system#status"><code>status</code></a></td><td>Report adapter health, platform, permissions, and supported surfaces.</td></tr>
     <tr><td><a href="/desktop/commands/system#permissions"><code>permissions</code></a></td><td>Check, request, or guide the grant of OS permissions.</td></tr>

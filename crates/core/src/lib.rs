@@ -36,7 +36,7 @@ pub use adapter::PlatformAdapter;
 pub use adapter::actions::ActionOps;
 pub use adapter::adapter_session::AdapterSession;
 pub use adapter::hit_test::HitTestResult;
-pub use adapter::input::InputOps;
+pub use adapter::input::{InputOps, RecordSink};
 pub use adapter::live_element::LiveElement;
 pub use adapter::live_identity::LiveIdentity;
 pub use adapter::native_handle::NativeHandle;
@@ -66,6 +66,9 @@ pub use input::mouse_click_count::{MAX_MOUSE_CLICK_COUNT, validate_mouse_click_c
 pub use input::mouse_event::MouseEvent;
 pub use input::mouse_event_kind::MouseEventKind;
 pub use input::pointer_observation::PointerObservation;
+pub use input::record_request::RecordRequest;
+pub use input::record_summary::RecordSummary;
+pub use input::recorded_event::RecordedEvent;
 pub use locator::containment_predicate::ContainmentPredicate;
 pub use locator::identity_predicate::IdentityPredicate;
 pub use locator::live_locator::{

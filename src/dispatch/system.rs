@@ -1,14 +1,15 @@
 use agent_desktop_core::{
     AppError, PermissionReport, PlatformAdapter,
     commands::{
-        permissions as permissions_command, skills as skills_command, wait as wait_command,
-        wait_surface::SurfaceWait,
+        permissions as permissions_command, record as record_command, skills as skills_command,
+        wait as wait_command, wait_surface::SurfaceWait,
     },
     context::CommandContext,
 };
 use serde_json::Value;
 
 use crate::cli_args::{
+    record::RecordArgs,
     skills::{SkillsAction, SkillsArgs},
     system::{PermissionsArgs, WaitArgs},
 };
@@ -59,6 +60,20 @@ pub(super) fn permissions(
         },
         adapter,
         permission_report,
+    )
+}
+
+pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
+    record_command::execute(
+        record_command::RecordArgs {
+            out: args.out,
+            app: args.app,
+            window_id: args.window_id,
+            max_duration_ms: args.max_duration_ms,
+            stop_file: args.stop_file,
+            include_injected: args.include_injected,
+        },
+        adapter,
     )
 }
 

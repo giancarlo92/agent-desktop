@@ -2,8 +2,8 @@ use agent_desktop_core::{
     AccessibilityNode, ActionOps, AdapterError, AppInfo, ClipboardContent, ClipboardFormat,
     Deadline, DragParams, ElementState, InputOps, InteractionLease, KeyCombo, LiveElement,
     MouseEvent, NativeHandle, ObservationOps, ObservationRequest, ObservationRoot, OperationReport,
-    ProcessIdentity, Rect, RefEntry, SnapshotSurface, SurfaceInfo, TreeOptions, WindowFilter,
-    WindowInfo,
+    ProcessIdentity, RecordRequest, RecordSink, RecordSummary, Rect, RefEntry, SnapshotSurface,
+    SurfaceInfo, TreeOptions, WindowFilter, WindowInfo,
 };
 use std::collections::HashSet;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -287,5 +287,13 @@ impl InputOps for WindowsAdapter {
     ) -> Result<OperationReport, AdapterError> {
         crate::input::clipboard::set_content(content, lease.deadline())?;
         Ok(OperationReport::clipboard_written("clipboard-set", false))
+    }
+
+    fn record_input(
+        &self,
+        request: &RecordRequest,
+        sink: &mut RecordSink<'_>,
+    ) -> Result<RecordSummary, AdapterError> {
+        crate::input::record::record_input(request, sink)
     }
 }

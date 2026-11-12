@@ -9,3 +9,6 @@ pub(crate) mod mouse_click_count;
 pub(crate) mod mouse_event;
 pub(crate) mod mouse_event_kind;
 pub(crate) mod pointer_observation;
+pub(crate) mod record_request;
+pub(crate) mod record_summary;
+pub(crate) mod recorded_event;

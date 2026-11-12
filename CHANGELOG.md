@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* Add `agent-desktop record` on Windows. It streams a person's own clicks, typing, combo box choices, key presses and scrolls to a JSON Lines file, naming each target by role, name and native id with its window, ancestors and a `match_count` that flags identities that would be ambiguous on replay. Password fields are recorded without their text, and input Windows marks as injected is ignored unless `--include-injected`.
+
+### Bug Fixes
+
+* On Windows, treat a radio button's `SelectionItem.IsSelected` as its observed state, so `click`, `check` and `select` no longer time out at the visibility gate on Chromium and WinForms radios, which expose no `ToggleState`.
+* On Windows, give a just-expanded combo box up to one second to publish its items before `select` reports `ELEMENT_NOT_FOUND`, which fixed `select` on a freshly loaded Chromium `<select>`.
+
 ## [1.3.0](https://github.com/vercel-labs/agent-desktop/compare/v1.2.0...v1.3.0) (2026-11-11)
 
 ### ⚠ BREAKING CHANGES

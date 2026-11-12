@@ -1,0 +1,70 @@
+---
+title: record
+navTitle: Recording
+description: Reference for the record command, which streams a person's own clicks, typing, choices, key presses and scrolls to a JSON Lines file with the accessibility identity of every target.
+---
+
+`record` watches what a person does in a window and writes one JSON line per action. Each line names the element the action targeted by its role, name and native id, the same evidence `find` and the ref commands use, so a recording can be replayed with ordinary commands. `record` only observes: it sends no input and takes no interaction lease. It runs on Windows; macOS and Linux return `PLATFORM_NOT_SUPPORTED`.
+
+## record
+
+```bash
+agent-desktop record --out FILE [--app NAME | --window-id ID] [--stop-file PATH] [--max-duration-ms MS] [--include-injected]
+```
+
+<table>
+  <thead>
+    <tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>--out FILE</code></td><td>none</td><td>JSON Lines file the recording is streamed to. Missing parent directories are created. Each line is flushed as it is written.</td></tr>
+    <tr><td><code>--app NAME</code></td><td>every app</td><td>Keep only actions in this application's windows and popups.</td></tr>
+    <tr><td><code>--window-id ID</code></td><td>every window</td><td>Keep only actions in this window (an id from <code>list-windows</code>), its dialogs and its popups. Not combinable with <code>--app</code>.</td></tr>
+    <tr><td><code>--stop-file PATH</code></td><td>none</td><td>Stop when this file appears. It must not exist when the session starts.</td></tr>
+    <tr><td><code>--max-duration-ms MS</code></td><td><code>600000</code></td><td>Stop after this long. At most <code>3600000</code>.</td></tr>
+    <tr><td><code>--include-injected</code></td><td>off</td><td>Also record input Windows marks as injected. Off by default so the recorder ignores agent-desktop's own actions.</td></tr>
+  </tbody>
+</table>
+
+The session also stops on Ctrl+C or Ctrl+Break in the console that runs it. Actions in that console and in the recorder's own process are never recorded. Start the demonstration after the `recording_ready` line appears in the file; actions before it are not seen.
+
+The envelope is printed once, when the session ends:
+
+```json
+{ "version": "2.6", "ok": true, "command": "record",
+  "data": { "out": "demo.jsonl", "format": "agent-desktop.recording/v1", "events": 14,
+            "duration_ms": 8410, "stop_reason": "stop_file" } }
+```
+
+`stop_reason` is `interrupted`, `stop_file` or `max_duration`.
+
+## The recording file
+
+The first line is `recording_started` with the session parameters, then `recording_ready`, then one line per action, and `recording_stopped` last. Every action line has `kind`, `t_ms` (milliseconds since the session started), `window` (`id`, `title`, `app_name`, `pid`) and, when UI Automation answers, `element` (`role`, `name`, `native_id`, `class_name`, `bounds`), up to six `ancestors` with a name or native id, and `match_count`: how many elements in the same top-level window share the element's control type and identity. A `match_count` above 1 means the identity alone is ambiguous on replay and the ancestors are needed.
+
+<table>
+  <thead>
+    <tr><th><code>kind</code></th><th>Recorded when</th><th>Extra fields</th><th>Replay with</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>click</code></td><td>A mouse button is pressed.</td><td><code>button</code>, <code>count</code> (position in a multi-click), <code>point</code>, <code>state_after</code> (<code>checked</code>, <code>selected</code>), and <code>hit</code> when the press landed on a container and was attributed to the control that took focus or changed state.</td><td><code>click</code>, or <code>check</code> and <code>uncheck</code> from <code>state_after.checked</code>.</td></tr>
+    <tr><td><code>type</code></td><td>Typing in one field ends: a commit key, a click elsewhere, a shortcut, or the end of the session.</td><td><code>value</code> (the field's content once typing paused), <code>typed</code> (the keystroke text while it is exact), <code>source</code> (<code>value</code> or <code>keys</code>), and <code>secure: true</code> for a password field, which carries neither <code>value</code> nor <code>typed</code>.</td><td><code>set-value</code> with <code>value</code>.</td></tr>
+    <tr><td><code>select</code></td><td>A combo box's value changes after a click on it, whether the option was clicked in its popup, picked by releasing the button over it, or chosen from the keyboard.</td><td><code>value</code>, <code>previous</code>.</td><td><code>select</code> with <code>value</code>.</td></tr>
+    <tr><td><code>press</code></td><td>Return, Tab, Escape, Page Up, Page Down or a function key; a navigation key outside a text field; or any key with Ctrl, Alt or the Windows key.</td><td><code>keys</code> in <code>press</code> syntax, or <code>vk</code> for a key <code>press</code> cannot name.</td><td><code>press</code>.</td></tr>
+    <tr><td><code>scroll</code></td><td>A run of wheel notches in one direction at one place ends.</td><td><code>direction</code>, <code>amount</code> (notches), <code>point</code>.</td><td><code>scroll</code>.</td></tr>
+  </tbody>
+</table>
+
+Clicks inside an open combo box's popup are not recorded separately; the `select` line carries the choice.
+
+```json
+{"kind":"type","t_ms":2170,"element":{"role":"textfield","name":"Nombre","native_id":"nombre"},"value":"Ana","typed":"ana","source":"value","match_count":1,"window":{"id":"w-200744","title":"Formulario - Google Chrome","app_name":"chrome.exe","pid":29268}}
+{"kind":"select","t_ms":5210,"element":{"role":"combobox","name":"País","native_id":"pais"},"value":"Perú","previous":"Elige un país","match_count":1,"window":{"id":"w-200744","title":"Formulario - Google Chrome","app_name":"chrome.exe","pid":29268}}
+{"kind":"click","t_ms":6044,"element":{"role":"radiobutton","name":"Pro","native_id":"plan-pro"},"hit":{"role":"group","name":"Plan"},"state_after":{"selected":true},"button":"left","count":1,"point":{"x":301,"y":655},"window":{"id":"w-200744","title":"Formulario - Google Chrome","app_name":"chrome.exe","pid":29268}}
+```
+
+## Limits
+
+- A key that composes with a dead key (an accent) is missing its accent in `typed`; `value` is exact when the control exposes one.
+- A surface with no UI Automation provider records the `point` and `window` without an `element`.
+- Actions in an elevated window are only identified when the recorder runs elevated too.

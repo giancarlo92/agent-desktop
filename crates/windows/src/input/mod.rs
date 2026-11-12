@@ -36,6 +36,7 @@ mod drag_state;
 pub(crate) mod elevation;
 pub(crate) mod keyboard;
 pub(crate) mod mouse;
+pub(crate) mod record;
 mod release_state;
 
 #[cfg(all(test, target_os = "windows"))]

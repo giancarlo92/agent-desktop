@@ -51,6 +51,7 @@ pub(crate) mod point_resolve;
 pub(crate) mod pointer_action;
 pub mod press;
 pub mod query;
+pub mod record;
 pub mod resize_window;
 pub mod restore;
 pub mod right_click;
