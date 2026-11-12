@@ -68,6 +68,7 @@ fn args(out: PathBuf) -> RecordArgs {
         out,
         app: Some("Calculator".into()),
         window_id: None,
+        display: None,
         max_duration_ms: Some(5000),
         stop_file: None,
         include_injected: false,
@@ -151,13 +152,33 @@ fn a_duration_outside_the_bounds_is_refused() {
 }
 
 #[test]
-fn app_and_window_id_together_are_refused() {
-    let mut request = args(scratch("both").join("demo.jsonl"));
-    request.window_id = Some("w-1".into());
+fn only_one_scope_is_accepted() {
+    for (window_id, display) in [(Some("w-1"), None), (None, Some("monitor-1"))] {
+        let mut request = args(scratch("both").join("demo.jsonl"));
+        request.window_id = window_id.map(Into::into);
+        request.display = display.map(Into::into);
 
-    let error = execute(request, &ScriptedRecorder::emitting(Vec::new())).unwrap_err();
+        let error = execute(request, &ScriptedRecorder::emitting(Vec::new())).unwrap_err();
 
-    assert_eq!(error.code(), "INVALID_ARGS");
+        assert_eq!(error.code(), "INVALID_ARGS");
+    }
+}
+
+#[test]
+fn a_display_scope_reaches_the_adapter_and_the_header() {
+    let dir = scratch("display");
+    let out = dir.join("demo.jsonl");
+    let mut request = args(out.clone());
+    request.app = None;
+    request.display = Some("monitor-2".into());
+    let recorder = ScriptedRecorder::emitting(Vec::new());
+
+    execute(request, &recorder).unwrap();
+
+    let seen = recorder.seen.lock().unwrap().clone().unwrap();
+    assert_eq!(seen.display.as_deref(), Some("monitor-2"));
+    assert_eq!(lines(&out)[0]["display"], "monitor-2");
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]

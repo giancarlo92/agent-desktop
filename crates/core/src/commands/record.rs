@@ -22,6 +22,7 @@ pub struct RecordArgs {
     pub out: PathBuf,
     pub app: Option<String>,
     pub window_id: Option<String>,
+    pub display: Option<String>,
     pub max_duration_ms: Option<u64>,
     pub stop_file: Option<PathBuf>,
     pub include_injected: bool,
@@ -73,9 +74,13 @@ fn record_request(args: &RecordArgs) -> Result<RecordRequest, AppError> {
             "--max-duration-ms must be between 1 and {MAX_RECORD_DURATION_MS}"
         )));
     }
-    if args.app.is_some() && args.window_id.is_some() {
+    let scopes = [&args.app, &args.window_id, &args.display]
+        .iter()
+        .filter(|scope| scope.is_some())
+        .count();
+    if scopes > 1 {
         return Err(AppError::invalid_input(
-            "record accepts --app or --window-id, not both",
+            "record accepts one of --app, --window-id or --display",
         ));
     }
     if let Some(stop_file) = &args.stop_file {
@@ -94,6 +99,7 @@ fn record_request(args: &RecordArgs) -> Result<RecordRequest, AppError> {
     Ok(RecordRequest {
         app: args.app.clone(),
         window_id: args.window_id.clone(),
+        display: args.display.clone(),
         max_duration_ms,
         stop_file: args.stop_file.clone(),
         include_injected: args.include_injected,
@@ -126,6 +132,9 @@ fn header(request: &RecordRequest) -> Value {
     }
     if let Some(window_id) = &request.window_id {
         line["window_id"] = json!(window_id);
+    }
+    if let Some(display) = &request.display {
+        line["display"] = json!(display);
     }
     line
 }

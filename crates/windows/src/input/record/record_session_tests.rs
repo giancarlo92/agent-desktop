@@ -282,6 +282,7 @@ fn a_browser_form_demonstration_records_every_step() {
     let request = RecordRequest {
         app: None,
         window_id: Some(window_id.clone()),
+        display: None,
         max_duration_ms: 60_000,
         stop_file: None,
         include_injected: false,

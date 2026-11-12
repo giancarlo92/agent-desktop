@@ -4,7 +4,9 @@
 //! tells the consumer the recorded identity alone will be ambiguous on
 //! replay and needs the ancestors to disambiguate.
 
-use agent_desktop_core::{AdapterError, LocatorField, RecordRequest, WindowInfo, app_name_matches};
+use agent_desktop_core::{
+    AdapterError, LocatorField, RecordRequest, Rect, WindowInfo, app_name_matches,
+};
 use serde_json::{Map, Value, json};
 use uiautomation::patterns::{UISelectionItemPattern, UITogglePattern};
 use uiautomation::types::{Handle, Point, ToggleState, TreeScope, UIProperty};
@@ -14,7 +16,9 @@ use windows_sys::Win32::Foundation::POINT;
 use windows_sys::Win32::System::Console::GetConsoleWindow;
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, WindowFromPoint};
 
-use super::record_window::{WindowBook, root_of_handle, window_id_of};
+use super::record_window::{
+    WindowBook, contains, display_bounds, root_of_handle, window_center, window_id_of,
+};
 use crate::tree::automation::automation_client;
 use crate::tree::element::UIAElement;
 use crate::tree::properties::property_ids::TreeProperty;
@@ -34,6 +38,7 @@ pub(super) struct Target {
     pub(super) window: Option<WindowInfo>,
     owner_id: Option<String>,
     root: isize,
+    spot: Option<(i32, i32)>,
 }
 
 /// A text field's content when a typing run ends.
@@ -51,6 +56,7 @@ pub(super) struct Observer {
     own_console: Option<String>,
     app: Option<String>,
     window_id: Option<String>,
+    display: Option<Rect>,
 }
 
 impl Observer {
@@ -58,6 +64,10 @@ impl Observer {
         let client = automation_client()?;
         let walker = client.get_control_view_walker().ok();
         let console = root_of_handle(unsafe { GetConsoleWindow() } as isize);
+        let display = match &request.display {
+            Some(id) => Some(display_bounds(id)?),
+            None => None,
+        };
         Ok(Self {
             client,
             walker,
@@ -66,6 +76,7 @@ impl Observer {
             own_console: (console != 0).then(|| window_id_of(console)),
             app: request.app.clone(),
             window_id: request.window_id.clone(),
+            display,
         })
     }
 
@@ -76,7 +87,7 @@ impl Observer {
             .ok()
             .map(UIAElement::from);
         let handle = unsafe { WindowFromPoint(POINT { x, y }) } as isize;
-        self.target(element, handle)
+        self.target(element, handle, Some((x, y)))
     }
 
     pub(super) fn focused(&mut self) -> Target {
@@ -85,22 +96,29 @@ impl Observer {
             .as_ref()
             .and_then(|element| self.native_handle_of(element))
             .unwrap_or_else(|| unsafe { GetForegroundWindow() } as isize);
-        self.target(element, handle)
+        let spot = window_center(root_of_handle(handle));
+        self.target(element, handle, spot)
     }
 
-    fn target(&mut self, element: Option<UIAElement>, handle: isize) -> Target {
+    fn target(
+        &mut self,
+        element: Option<UIAElement>,
+        handle: isize,
+        spot: Option<(i32, i32)>,
+    ) -> Target {
         let resolved = self.windows.resolve(handle, self.window_id.as_deref());
         Target {
             element,
             window: resolved.window,
             owner_id: resolved.owner_id,
             root: root_of_handle(handle),
+            spot,
         }
     }
 
-    /// Whether the target passes the session's `--app` or `--window-id`
-    /// filter. The recorder's own process and the console it runs in never
-    /// pass, so stopping the session with Ctrl+C is not recorded.
+    /// Whether the target passes the session's `--app`, `--window-id` or
+    /// `--display` filter. The recorder's own process and the console it runs
+    /// in never pass, so stopping the session with Ctrl+C is not recorded.
     pub(super) fn keeps(&self, target: &Target) -> bool {
         let element_pid = target
             .element
@@ -108,6 +126,12 @@ impl Observer {
             .and_then(|element| element.0.get_process_id().ok());
         if element_pid == Some(self.own_pid) {
             return false;
+        }
+        if let Some(display) = &self.display {
+            let on_display = target.spot.is_some_and(|(x, y)| contains(display, x, y));
+            if !on_display {
+                return false;
+            }
         }
         match &target.window {
             Some(window) if window.pid == self.own_pid => false,

@@ -14,6 +14,11 @@ pub(crate) struct RecordArgs {
     pub window_id: Option<String>,
     #[arg(
         long,
+        help = "Keep only actions on this display (an id from list-displays)"
+    )]
+    pub display: Option<String>,
+    #[arg(
+        long,
         help = "Stop after this many milliseconds (default 600000, at most 3600000)"
     )]
     pub max_duration_ms: Option<u64>,

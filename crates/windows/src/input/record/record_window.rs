@@ -6,8 +6,11 @@
 //! window that owns it and otherwise to a listed window of the same process,
 //! so an `--app` or `--window-id` filter keeps the actions taken inside it.
 
-use agent_desktop_core::{Deadline, WindowFilter, WindowInfo};
-use windows_sys::Win32::UI::WindowsAndMessaging::{GetAncestor, GetWindowThreadProcessId};
+use agent_desktop_core::{AdapterError, Deadline, ErrorCode, Rect, WindowFilter, WindowInfo};
+use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetAncestor, GetWindowRect, GetWindowThreadProcessId,
+};
 
 use crate::system::window::window_ops::list_windows_live;
 
@@ -111,3 +114,49 @@ pub(super) fn ancestor(handle: isize, kind: u32) -> isize {
 pub(super) fn root_of_handle(handle: isize) -> isize {
     ancestor(handle, GA_ROOT)
 }
+
+/// The bounds of the display `list-displays` names `id`, in the physical
+/// pixels the hooks report.
+pub(super) fn display_bounds(id: &str) -> Result<Rect, AdapterError> {
+    let deadline = Deadline::detached_after(WINDOW_LIST_TIMEOUT_MS)?;
+    crate::system::display::list_displays_live(deadline)?
+        .into_iter()
+        .find(|display| display.id == id)
+        .map(|display| display.bounds)
+        .ok_or_else(|| {
+            AdapterError::new(
+                ErrorCode::InvalidArgs,
+                format!("No display has the id '{id}'"),
+            )
+            .with_suggestion("Run list-displays and pass one of its ids")
+        })
+}
+
+/// The center of a top-level window, where a key action is placed when the
+/// session is scoped to one display.
+pub(super) fn window_center(handle: isize) -> Option<(i32, i32)> {
+    if handle == 0 {
+        return None;
+    }
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+    if unsafe { GetWindowRect(handle as _, &mut rect) } == 0 {
+        return None;
+    }
+    Some(((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2))
+}
+
+/// Whether a point lies on a display, its right and bottom edges excluded so
+/// a point on the seam between two displays belongs to exactly one.
+pub(super) fn contains(bounds: &Rect, x: i32, y: i32) -> bool {
+    let (x, y) = (f64::from(x), f64::from(y));
+    x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width && y < bounds.y + bounds.height
+}
+
+#[cfg(test)]
+#[path = "record_window_tests.rs"]
+mod tests;

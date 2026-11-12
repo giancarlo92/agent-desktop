@@ -69,6 +69,7 @@ pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<
             out: args.out,
             app: args.app,
             window_id: args.window_id,
+            display: args.display,
             max_duration_ms: args.max_duration_ms,
             stop_file: args.stop_file,
             include_injected: args.include_injected,

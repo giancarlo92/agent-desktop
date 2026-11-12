@@ -9,7 +9,7 @@ description: Reference for the record command, which streams a person's own clic
 ## record
 
 ```bash
-agent-desktop record --out FILE [--app NAME | --window-id ID] [--stop-file PATH] [--max-duration-ms MS] [--include-injected]
+agent-desktop record --out FILE [--app NAME | --window-id ID | --display ID] [--stop-file PATH] [--max-duration-ms MS] [--include-injected]
 ```
 
 <table>
@@ -19,7 +19,8 @@ agent-desktop record --out FILE [--app NAME | --window-id ID] [--stop-file PATH]
   <tbody>
     <tr><td><code>--out FILE</code></td><td>none</td><td>JSON Lines file the recording is streamed to. Missing parent directories are created. Each line is flushed as it is written.</td></tr>
     <tr><td><code>--app NAME</code></td><td>every app</td><td>Keep only actions in this application's windows and popups.</td></tr>
-    <tr><td><code>--window-id ID</code></td><td>every window</td><td>Keep only actions in this window (an id from <code>list-windows</code>), its dialogs and its popups. Not combinable with <code>--app</code>.</td></tr>
+    <tr><td><code>--window-id ID</code></td><td>every window</td><td>Keep only actions in this window (an id from <code>list-windows</code>), its dialogs and its popups.</td></tr>
+    <tr><td><code>--display ID</code></td><td>every display</td><td>Keep only actions on this display (an id from <code>list-displays</code>): a pointer action that lands on it, and a key action whose focused window's center is on it. Pass at most one of <code>--app</code>, <code>--window-id</code> and <code>--display</code>.</td></tr>
     <tr><td><code>--stop-file PATH</code></td><td>none</td><td>Stop when this file appears. It must not exist when the session starts.</td></tr>
     <tr><td><code>--max-duration-ms MS</code></td><td><code>600000</code></td><td>Stop after this long. At most <code>3600000</code>.</td></tr>
     <tr><td><code>--include-injected</code></td><td>off</td><td>Also record input Windows marks as injected. Off by default so the recorder ignores agent-desktop's own actions.</td></tr>
