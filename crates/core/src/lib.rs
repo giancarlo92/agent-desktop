@@ -67,7 +67,7 @@ pub use input::mouse_event::MouseEvent;
 pub use input::mouse_event_kind::MouseEventKind;
 pub use input::pointer_observation::PointerObservation;
 pub use input::record_request::RecordRequest;
-pub use input::record_summary::RecordSummary;
+pub use input::record_summary::{RecordSummary, RecordedVideo};
 pub use input::recorded_event::RecordedEvent;
 pub use input::stroke_params::{MAX_STROKE_MS, MAX_STROKE_POINTS, StrokeParams, StrokePoint};
 pub use locator::containment_predicate::ContainmentPredicate;

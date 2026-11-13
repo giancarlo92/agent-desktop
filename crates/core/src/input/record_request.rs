@@ -16,4 +16,7 @@ pub struct RecordRequest {
     pub max_duration_ms: u64,
     pub stop_file: Option<PathBuf>,
     pub include_injected: bool,
+    /// Where to write an MP4 video of the recorded area (the window, the
+    /// display, or the display an app is on), when one is asked for.
+    pub video: Option<PathBuf>,
 }

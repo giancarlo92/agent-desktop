@@ -24,6 +24,8 @@ use super::record_hook::{self, RawInput};
 use super::record_keys::{KeyClass, ModifierState, classify, key_name};
 use super::record_stop::{InterruptGuard, StopWatch};
 use super::record_text::typed_text;
+use super::record_video::VideoRecorder;
+use super::record_video_area::area_for;
 
 const POLL: Duration = Duration::from_millis(50);
 const SETTLE: Duration = Duration::from_millis(40);
@@ -40,6 +42,10 @@ pub(super) fn run(
     let started = Instant::now();
     let mut stop = StopWatch::new(started, request.max_duration_ms, request.stop_file.clone());
     let (hooks, inputs) = record_hook::start(request.include_injected)?;
+    let video = match &request.video {
+        Some(path) => Some(VideoRecorder::start(path, area_for(request)?, started)?),
+        None => None,
+    };
     let mut recorder = Recorder::new(observer, started, sink);
     recorder.emit(RECORDING_READY_KIND, Instant::now(), Map::new())?;
     let stop_reason = loop {
@@ -58,9 +64,19 @@ pub(super) fn run(
         recorder.handle(input)?;
     }
     recorder.finish()?;
+    let duration_ms = millis_between(started, Instant::now());
+    let video = match video.map(VideoRecorder::finish) {
+        Some(Ok(video)) => Some(video),
+        Some(Err(error)) => {
+            tracing::warn!(%error, "record: the video could not be finished");
+            None
+        }
+        None => None,
+    };
     Ok(RecordSummary {
-        duration_ms: millis_between(started, Instant::now()),
+        duration_ms,
         stop_reason,
+        video,
     })
 }
 

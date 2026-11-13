@@ -64,18 +64,51 @@ pub(super) fn permissions(
 }
 
 pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
-    record_command::execute(
-        record_command::RecordArgs {
-            out: args.out,
-            app: args.app,
-            window_id: args.window_id,
-            display: args.display,
-            max_duration_ms: args.max_duration_ms,
-            stop_file: args.stop_file,
-            include_injected: args.include_injected,
-        },
-        adapter,
-    )
+    use crate::cli_args::record::RecordAction;
+    use agent_desktop_core::commands::record_background;
+    match args.action {
+        Some(RecordAction::Start(start)) => {
+            record_background::start(record_background::StartArgs {
+                out: start.out,
+                app: start.scope.app,
+                window_id: start.scope.window_id,
+                display: start.scope.display,
+                max_duration_ms: start.scope.max_duration_ms,
+                include_injected: start.scope.include_injected,
+                video: start.video.video,
+                video_out: start.video.video_out,
+            })
+        }
+        Some(RecordAction::Stop(stop)) => {
+            record_background::stop(stop.id.as_deref(), stop.timeout_ms)
+        }
+        None => {
+            let out = args.out.ok_or_else(|| {
+                AppError::invalid_input_with_suggestion(
+                    "record needs --out",
+                    "Pass --out FILE, or use 'record start' to record in the background",
+                )
+            })?;
+            let video = match (args.video.video_out, args.video.video) {
+                (Some(path), _) => Some(path),
+                (None, true) => Some(record_command::default_video_path(&out)),
+                (None, false) => None,
+            };
+            record_command::execute(
+                record_command::RecordArgs {
+                    out,
+                    app: args.scope.app,
+                    window_id: args.scope.window_id,
+                    display: args.scope.display,
+                    max_duration_ms: args.scope.max_duration_ms,
+                    stop_file: args.stop_file,
+                    include_injected: args.scope.include_injected,
+                    video,
+                },
+                adapter,
+            )
+        }
+    }
 }
 
 pub(super) fn skills(args: SkillsArgs) -> Result<Value, AppError> {

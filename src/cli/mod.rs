@@ -156,7 +156,7 @@ pub(crate) enum Commands {
     #[command(about = "Wait for time (ms), element presence, text, or window appearance")]
     Wait(WaitArgs),
     #[command(
-        about = "Record the user's own clicks, typing, key presses and scrolls to a JSON Lines file until stopped"
+        about = "Record the user's own clicks, typing, key presses and scrolls (and a video) to a JSON Lines file until stopped; record start/stop run it in the background"
     )]
     Record(RecordArgs),
     #[command(about = "Show adapter health, platform info, and permission state")]

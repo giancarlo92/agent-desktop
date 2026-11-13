@@ -4,6 +4,8 @@
 
 ### Features
 
+* Add `record start` and `record stop`: a recording that runs in the background between two calls, for agents (MCP tools `desktop_record_start` and `desktop_record_stop`). `start` returns once the session is ready, with its id and paths; `stop` returns the summary.
+* Add `--video` and `--video-out` to `record` and `record start` on Windows: an H.264 MP4 of the recorded window or display, with the pointer, whose `offset_ms` maps each action's `t_ms` to the video.
 * Add `agent-desktop stroke` on Windows: a left-button drag along a path of points at their times, such as a line drawn on a canvas. It takes `x,y` pairs or the JSON `path` of a recorded drag, and `--offset` for a window that moved. A recorded `drag` now carries that `path`.
 * Add `agent-desktop record` on Windows. It streams a person's own clicks, typing, combo box choices, key presses and scrolls to a JSON Lines file, naming each target by role, name and native id with its window, ancestors and a `match_count` that flags identities that would be ambiguous on replay. Password fields are recorded without their text, and input Windows marks as injected is ignored unless `--include-injected`.
 

@@ -32,6 +32,9 @@ mod record_session;
 mod record_stop;
 #[cfg(target_os = "windows")]
 mod record_text;
+mod record_video;
+mod record_video_area;
+mod record_video_frame;
 #[cfg(target_os = "windows")]
 mod record_window;
 

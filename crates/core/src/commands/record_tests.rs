@@ -31,6 +31,7 @@ impl InputOps for ScriptedRecorder {
             sink(event.clone())?;
         }
         Ok(RecordSummary {
+            video: None,
             duration_ms: 1234,
             stop_reason: "stop_file",
         })
@@ -72,6 +73,7 @@ fn args(out: PathBuf) -> RecordArgs {
         max_duration_ms: Some(5000),
         stop_file: None,
         include_injected: false,
+        video: None,
     }
 }
 

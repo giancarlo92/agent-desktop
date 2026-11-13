@@ -1,0 +1,317 @@
+//! `record start` and `record stop`: a recording that runs in the
+//! background between two calls, for an agent or a tool that cannot hold a
+//! process open.
+//!
+//! `start` runs `agent-desktop record` as a detached process with a stop
+//! file, waits until it reports `recording_ready`, and returns its id and
+//! paths. `stop` creates the stop file, waits for the `recording_stopped`
+//! line (which the session writes after it has finished its video), and
+//! returns the summary. Each session is described by
+//! `<state root>/recordings/<id>.json`; the events and the video go where the
+//! caller asked, by default beside that file.
+
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+use crate::AppError;
+use crate::commands::record::{RECORDING_READY_KIND, default_video_path};
+
+const READY_TIMEOUT: Duration = Duration::from_secs(20);
+const POLL: Duration = Duration::from_millis(100);
+/// How long `stop` waits by default: a video needs a moment to be finished.
+pub const DEFAULT_STOP_TIMEOUT_MS: u64 = 60_000;
+
+/// What `record start` records; the same scope and options as `record`.
+pub struct StartArgs {
+    pub out: Option<PathBuf>,
+    pub app: Option<String>,
+    pub window_id: Option<String>,
+    pub display: Option<String>,
+    pub max_duration_ms: Option<u64>,
+    pub include_injected: bool,
+    pub video: bool,
+    pub video_out: Option<PathBuf>,
+}
+
+/// A recording running in the background.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Session {
+    pub id: String,
+    pub pid: u32,
+    pub out: PathBuf,
+    pub video: Option<PathBuf>,
+    pub stop_file: PathBuf,
+}
+
+pub fn start(args: StartArgs) -> Result<Value, AppError> {
+    let dir = sessions_dir()?;
+    let id = new_id(&dir);
+    let out = args
+        .out
+        .clone()
+        .unwrap_or_else(|| dir.join(format!("{id}.jsonl")));
+    let video = match (&args.video_out, args.video) {
+        (Some(path), _) => Some(path.clone()),
+        (None, true) => Some(default_video_path(&out)),
+        (None, false) => None,
+    };
+    let session = Session {
+        id: id.clone(),
+        pid: 0,
+        stop_file: dir.join(format!("{id}.stop")),
+        out,
+        video,
+    };
+    let log = dir.join(format!("{id}.log"));
+    let mut child = spawn(&args, &session, &log)?;
+    let session = Session {
+        pid: child.id(),
+        ..session
+    };
+    write_state(&dir, &session)?;
+    let deadline = Instant::now() + READY_TIMEOUT;
+    loop {
+        if has_line(&session.out, RECORDING_READY_KIND) {
+            break;
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            let reason = tail(&log);
+            let _ = std::fs::remove_file(state_path(&dir, &session.id));
+            let _ = std::fs::remove_file(&log);
+            return Err(AppError::invalid_input(format!(
+                "The recording ended before it was ready ({status}): {reason}"
+            )));
+        }
+        if Instant::now() >= deadline {
+            let _ = std::fs::write(&session.stop_file, b"");
+            return Err(AppError::Internal(
+                "The recording did not get ready within 20 s".into(),
+            ));
+        }
+        std::thread::sleep(POLL);
+    }
+    Ok(json!({
+        "id": session.id,
+        "state": "recording",
+        "pid": session.pid,
+        "out": session.out.to_string_lossy(),
+        "video": session.video.as_ref().map(|p| p.to_string_lossy().into_owned()),
+    }))
+}
+
+pub fn stop(id: Option<&str>, timeout_ms: Option<u64>) -> Result<Value, AppError> {
+    let dir = sessions_dir()?;
+    let running = sessions(&dir);
+    let session = choose(&running, id)?.clone();
+    if !session.stop_file.exists() {
+        std::fs::write(&session.stop_file, b"").map_err(AppError::Io)?;
+    }
+    let wait = Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_STOP_TIMEOUT_MS));
+    let deadline = Instant::now() + wait;
+    let trailer = loop {
+        if let Some(line) = last_line_of_kind(&session.out, "recording_stopped") {
+            break line;
+        }
+        if Instant::now() >= deadline {
+            return Err(AppError::Internal(format!(
+                "Recording {} did not stop within {} ms; run record stop again to keep waiting",
+                session.id,
+                wait.as_millis()
+            )));
+        }
+        std::thread::sleep(POLL);
+    };
+    let _ = std::fs::remove_file(&session.stop_file);
+    let _ = std::fs::remove_file(state_path(&dir, &session.id));
+    let _ = std::fs::remove_file(dir.join(format!("{}.log", session.id)));
+    let mut result = json!({
+        "id": session.id,
+        "state": "stopped",
+        "out": session.out.to_string_lossy(),
+        "events": trailer.get("events"),
+        "duration_ms": trailer.get("t_ms"),
+        "stop_reason": trailer.get("stop_reason"),
+    });
+    if let Some(video) = trailer.get("video") {
+        result["video"] = video.clone();
+    } else if session.video.is_some() {
+        result["video_error"] =
+            json!("The video was asked for but not written; see the recording's log");
+    }
+    Ok(result)
+}
+
+/// Picks the session to stop: the one named, or the only one running.
+pub(crate) fn choose<'a>(
+    running: &'a [Session],
+    id: Option<&str>,
+) -> Result<&'a Session, AppError> {
+    match id {
+        Some(id) => running.iter().find(|s| s.id == id).ok_or_else(|| {
+            AppError::invalid_input(format!("No recording '{id}' is running ({})", ids(running)))
+        }),
+        None => match running {
+            [only] => Ok(only),
+            [] => Err(AppError::invalid_input("No recording is running")),
+            _ => Err(AppError::invalid_input_with_suggestion(
+                format!(
+                    "{} recordings are running ({})",
+                    running.len(),
+                    ids(running)
+                ),
+                "Pass --id to choose one",
+            )),
+        },
+    }
+}
+
+fn ids(running: &[Session]) -> String {
+    let names: Vec<&str> = running.iter().map(|s| s.id.as_str()).collect();
+    if names.is_empty() {
+        "none".into()
+    } else {
+        names.join(", ")
+    }
+}
+
+fn spawn(args: &StartArgs, session: &Session, log: &Path) -> Result<std::process::Child, AppError> {
+    let exe = std::env::current_exe().map_err(AppError::Io)?;
+    let mut argv: Vec<std::ffi::OsString> = vec![
+        "record".into(),
+        "--out".into(),
+        session.out.clone().into(),
+        "--stop-file".into(),
+        session.stop_file.clone().into(),
+    ];
+    for (flag, value) in [
+        ("--app", &args.app),
+        ("--window-id", &args.window_id),
+        ("--display", &args.display),
+    ] {
+        if let Some(value) = value {
+            argv.push(flag.into());
+            argv.push(value.into());
+        }
+    }
+    if let Some(ms) = args.max_duration_ms {
+        argv.push("--max-duration-ms".into());
+        argv.push(ms.to_string().into());
+    }
+    if args.include_injected {
+        argv.push("--include-injected".into());
+    }
+    if let Some(video) = &session.video {
+        argv.push("--video-out".into());
+        argv.push(video.clone().into());
+    }
+    let log_file = std::fs::File::create(log).map_err(AppError::Io)?;
+    let mut command = std::process::Command::new(exe);
+    command
+        .args(argv)
+        .stdin(std::process::Stdio::null())
+        .stdout(log_file.try_clone().map_err(AppError::Io)?)
+        .stderr(log_file);
+    detach(&mut command);
+    command.spawn().map_err(AppError::Io)
+}
+
+/// Detaches the session from the caller. Windows lets a child inherit every
+/// inheritable handle of its parent, and the caller's pipes (a shell reading
+/// this command's output, an MCP client) are inheritable: a child holding
+/// them would keep the caller waiting until the recording ends. They are
+/// made non-inheritable first; the child gets only its log and no input.
+#[cfg(target_os = "windows")]
+fn detach(command: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
+    const STD_HANDLES: [u32; 3] = [-10i32 as u32, -11i32 as u32, -12i32 as u32];
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetStdHandle(which: u32) -> *mut std::ffi::c_void;
+        fn SetHandleInformation(handle: *mut std::ffi::c_void, mask: u32, flags: u32) -> i32;
+    }
+    for which in STD_HANDLES {
+        let handle = unsafe { GetStdHandle(which) };
+        if !handle.is_null() && handle as isize != -1 {
+            unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) };
+        }
+    }
+    command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn detach(_command: &mut std::process::Command) {}
+
+fn sessions_dir() -> Result<PathBuf, AppError> {
+    let dir = crate::storage::state_root::resolve_configured_state_root()?.join("recordings");
+    std::fs::create_dir_all(&dir).map_err(AppError::Io)?;
+    Ok(dir)
+}
+
+fn state_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join(format!("{id}.json"))
+}
+
+fn write_state(dir: &Path, session: &Session) -> Result<(), AppError> {
+    let raw = serde_json::to_vec_pretty(session).map_err(|e| AppError::Internal(e.to_string()))?;
+    std::fs::write(state_path(dir, &session.id), raw).map_err(AppError::Io)
+}
+
+/// The recordings started in the background that have not been stopped.
+pub fn sessions(dir: &Path) -> Vec<Session> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut found: Vec<Session> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .filter_map(|path| serde_json::from_slice(&std::fs::read(path).ok()?).ok())
+        .collect();
+    found.sort_by(|a, b| a.id.cmp(&b.id));
+    found
+}
+
+pub(crate) fn new_id(dir: &Path) -> String {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or_default();
+    let mut id = format!("rec-{stamp}");
+    let mut n = 1;
+    while state_path(dir, &id).exists() {
+        n += 1;
+        id = format!("rec-{stamp}-{n}");
+    }
+    id
+}
+
+fn has_line(path: &Path, kind: &str) -> bool {
+    std::fs::read_to_string(path)
+        .map(|text| text.contains(&format!("\"kind\":\"{kind}\"")))
+        .unwrap_or(false)
+}
+
+fn last_line_of_kind(path: &Path, kind: &str) -> Option<Value> {
+    let text = std::fs::read_to_string(path).ok()?;
+    text.lines()
+        .rev()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .find(|line| line.get("kind").and_then(Value::as_str) == Some(kind))
+}
+
+fn tail(log: &Path) -> String {
+    let text = std::fs::read_to_string(log).unwrap_or_default();
+    let trimmed = text.trim();
+    let start = trimmed.len().saturating_sub(600);
+    trimmed.get(start..).unwrap_or(trimmed).to_string()
+}
+
+#[cfg(test)]
+#[path = "record_background_tests.rs"]
+mod tests;

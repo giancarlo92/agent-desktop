@@ -332,6 +332,7 @@ fn a_browser_form_demonstration_records_every_step() {
         max_duration_ms: 60_000,
         stop_file: None,
         include_injected: false,
+        video: None,
     };
     let mut recorded: Vec<RecordedEvent> = Vec::new();
     let mut sink = |event: RecordedEvent| {

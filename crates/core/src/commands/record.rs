@@ -26,6 +26,8 @@ pub struct RecordArgs {
     pub max_duration_ms: Option<u64>,
     pub stop_file: Option<PathBuf>,
     pub include_injected: bool,
+    /// The MP4 video to write beside the events; `None` records no video.
+    pub video: Option<PathBuf>,
 }
 
 /// Streams the session to `args.out` as JSON lines: a `recording_started`
@@ -58,13 +60,17 @@ pub fn execute(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
         }
     };
     write_line(&mut writer, &trailer(&summary, events)).map_err(|e| unwritable(&args.out, e))?;
-    Ok(json!({
+    let mut result = json!({
         "out": args.out.to_string_lossy(),
         "format": RECORDING_FORMAT,
         "events": events,
         "duration_ms": summary.duration_ms,
         "stop_reason": summary.stop_reason,
-    }))
+    });
+    if let Some(video) = &summary.video {
+        result["video"] = json!(video);
+    }
+    Ok(result)
 }
 
 fn record_request(args: &RecordArgs) -> Result<RecordRequest, AppError> {
@@ -96,6 +102,9 @@ fn record_request(args: &RecordArgs) -> Result<RecordRequest, AppError> {
             ));
         }
     }
+    if let Some(video) = &args.video {
+        validate_video_path(video, args)?;
+    }
     Ok(RecordRequest {
         app: args.app.clone(),
         window_id: args.window_id.clone(),
@@ -103,7 +112,42 @@ fn record_request(args: &RecordArgs) -> Result<RecordRequest, AppError> {
         max_duration_ms,
         stop_file: args.stop_file.clone(),
         include_injected: args.include_injected,
+        video: args.video.clone(),
     })
+}
+
+/// The video's path, when `--video-out` is not given: the recording's, with
+/// the `.mp4` extension.
+pub fn default_video_path(out: &Path) -> PathBuf {
+    out.with_extension("mp4")
+}
+
+fn validate_video_path(video: &Path, args: &RecordArgs) -> Result<(), AppError> {
+    let mp4 = video
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("mp4"));
+    if !mp4 {
+        return Err(AppError::invalid_input(format!(
+            "The video '{}' must be an .mp4 file",
+            video.display()
+        )));
+    }
+    if video == args.out || args.stop_file.as_deref() == Some(video) {
+        return Err(AppError::invalid_input(
+            "The video must differ from --out and --stop-file",
+        ));
+    }
+    if crate::refs::is_symlink(video) {
+        return Err(AppError::invalid_input(format!(
+            "Refusing to write the video through the symbolic link '{}'",
+            video.display()
+        )));
+    }
+    if let Some(parent) = video.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| crate::refs::unwritable_output("the video", video, AppError::Io(e)))?;
+    }
+    Ok(())
 }
 
 fn open_recording(path: &Path) -> Result<BufWriter<File>, AppError> {
@@ -136,16 +180,23 @@ fn header(request: &RecordRequest) -> Value {
     if let Some(display) = &request.display {
         line["display"] = json!(display);
     }
+    if let Some(video) = &request.video {
+        line["video"] = json!(video.to_string_lossy());
+    }
     line
 }
 
 fn trailer(summary: &RecordSummary, events: u64) -> Value {
-    json!({
+    let mut line = json!({
         "kind": "recording_stopped",
         "t_ms": summary.duration_ms,
         "stop_reason": summary.stop_reason,
         "events": events,
-    })
+    });
+    if let Some(video) = &summary.video {
+        line["video"] = json!(video);
+    }
+    line
 }
 
 fn write_line(writer: &mut BufWriter<File>, line: &Value) -> std::io::Result<()> {

@@ -9,7 +9,9 @@ description: Reference for the record command, which streams a person's own clic
 ## record
 
 ```bash
-agent-desktop record --out FILE [--app NAME | --window-id ID | --display ID] [--stop-file PATH] [--max-duration-ms MS] [--include-injected]
+agent-desktop record --out FILE [--app NAME | --window-id ID | --display ID] [--stop-file PATH] [--max-duration-ms MS] [--include-injected] [--video | --video-out FILE.mp4]
+agent-desktop record start [--out FILE] [--app NAME | --window-id ID | --display ID] [--max-duration-ms MS] [--include-injected] [--video | --video-out FILE.mp4]
+agent-desktop record stop [--id ID] [--timeout-ms MS]
 ```
 
 <table>
@@ -24,6 +26,8 @@ agent-desktop record --out FILE [--app NAME | --window-id ID | --display ID] [--
     <tr><td><code>--stop-file PATH</code></td><td>none</td><td>Stop when this file appears. It must not exist when the session starts.</td></tr>
     <tr><td><code>--max-duration-ms MS</code></td><td><code>600000</code></td><td>Stop after this long. At most <code>3600000</code>.</td></tr>
     <tr><td><code>--include-injected</code></td><td>off</td><td>Also record input Windows marks as injected. Off by default so the recorder ignores agent-desktop's own actions.</td></tr>
+    <tr><td><code>--video</code></td><td>off</td><td>Also write an H.264 MP4 video of the recorded window, of the display (<code>--display</code>), of the display the app's first window is on (<code>--app</code>), or of the primary display. It goes beside <code>--out</code> with the <code>.mp4</code> extension.</td></tr>
+    <tr><td><code>--video-out FILE.mp4</code></td><td>none</td><td>Write the video to this file instead. Implies <code>--video</code>.</td></tr>
   </tbody>
 </table>
 
@@ -37,7 +41,18 @@ The envelope is printed once, when the session ends:
             "duration_ms": 8410, "stop_reason": "stop_file" } }
 ```
 
-`stop_reason` is `interrupted`, `stop_file` or `max_duration`.
+`stop_reason` is `interrupted`, `stop_file` or `max_duration`. With a video, `data.video` (and the `recording_stopped` line) gives `path`, `width`, `height`, `frames` and `offset_ms`: when the first frame was taken on the recording's clock, so an action at `t_ms` is at `t_ms - offset_ms` in the video. The video shows the area as it was placed when the session started, at 12 frames per second, with the pointer. If the video fails midway, the recording is kept and `data.video` is absent.
+
+## record start and record stop
+
+An agent or a tool that cannot hold a process open records in the background:
+
+```bash
+agent-desktop record start --window-id w-123 --video     # returns at once, after recording_ready
+agent-desktop record stop                                 # stops it and returns the summary
+```
+
+`start` takes the same scope and video flags as `record` and returns `{ "id", "state": "recording", "pid", "out", "video" }` once the session is observing input. Without `--out`, the events go to `recordings/<id>.jsonl` under the agent-desktop state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`). `stop` stops the only running session, or the one `--id` names, waits up to `--timeout-ms` (default 60000) for it to finish its video, and returns `{ "id", "state": "stopped", "out", "events", "duration_ms", "stop_reason", "video" }`. Through `agent-desktop mcp` they are the tools `desktop_record_start` and `desktop_record_stop`; the foreground `record` is not a tool, because it holds the call until the session ends.
 
 ## The recording file
 
