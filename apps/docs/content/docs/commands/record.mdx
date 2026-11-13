@@ -70,3 +70,14 @@ Clicks inside an open combo box's popup are not recorded separately; the `select
 - A key that composes with a dead key (an accent) is missing its accent in `typed`; `value` is exact when the control exposes one.
 - A surface with no UI Automation provider records the `point` and `window` without an `element`.
 - Actions in an elevated window are only identified when the recorder runs elevated too.
+
+## Replaying a stroke
+
+A drag on a canvas (a letter or a shape drawn with a pencil) names no element, so it is replayed with its `path` through `stroke`, which holds the left button down at the first point, moves through every point at its time and releases at the last. It runs on Windows and needs `--headed`.
+
+```bash
+agent-desktop --headed stroke --path "100,200;140,200;140,260"
+agent-desktop --headed stroke --path-file stroke.json --offset=-12,30
+```
+
+`--path` takes `x,y` pairs separated by `;`, or a JSON array of `[x, y]` or `[x, y, ms]` points, which is the shape of a recorded drag's `path`. `--path-file` reads the same formats from a file. Points without a time are `--step-ms` apart (16 by default). `--offset` adds to every point, for a window that moved since the recording. A stroke has 2 to 4096 points and lasts at most 60 seconds.

@@ -24,6 +24,7 @@ use crate::cli_args::{
     sandbox::SandboxArgs,
     session::SessionArgs,
     skills::SkillsArgs,
+    stroke::StrokeArgs,
     system::{
         AppRefArgs, ClipboardGetArgs, ClipboardSetArgs, CloseAppArgs, FocusWindowArgs, LaunchArgs,
         ListAppsArgs, ListWindowsArgs, MoveWindowCliArgs, OpenSystemSurfaceArgs, PermissionsArgs,
@@ -92,6 +93,10 @@ pub(crate) enum Commands {
     Drag(DragCliArgs),
     #[command(about = "Move cursor to absolute screen coordinates (requires --headed)")]
     MouseMove(MouseMoveArgs),
+    #[command(
+        about = "Drag with the left button along a path of points, such as a line drawn on a canvas (requires --headed)"
+    )]
+    Stroke(StrokeArgs),
     #[command(about = "Click at absolute screen coordinates (requires --headed)")]
     MouseClick(MouseClickArgs),
     #[command(
@@ -223,6 +228,7 @@ impl Commands {
             Self::Hover(_) => CommandMetadata::new("hover", true),
             Self::Drag(_) => CommandMetadata::new("drag", true),
             Self::MouseMove(_) => CommandMetadata::new("mouse-move", false),
+            Self::Stroke(_) => CommandMetadata::new("stroke", false),
             Self::MouseClick(_) => CommandMetadata::new("mouse-click", false),
             Self::MouseDown(_) => CommandMetadata::new("mouse-down", false),
             Self::MouseUp(_) => CommandMetadata::new("mouse-up", false),
@@ -295,6 +301,7 @@ impl Commands {
             | Self::Hover(_)
             | Self::Drag(_)
             | Self::MouseMove(_)
+            | Self::Stroke(_)
             | Self::MouseClick(_)
             | Self::MouseDown(_)
             | Self::MouseUp(_)

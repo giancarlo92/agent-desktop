@@ -81,7 +81,7 @@ const SHARED_REF_ACTION_TESTS: &[&str] = &[
 
 const BINARY_CONTRACT_TESTS: &[&str] = &["batch", "permissions", "sandbox", "version"];
 
-const RECORDING_COMMANDS: &[&str] = &["record"];
+const RECORDING_COMMANDS: &[&str] = &["record", "stroke"];
 
 const ADAPTER_PASSTHROUGH_COMMANDS: &[&str] = &[
     "clipboard-clear",
@@ -163,7 +163,7 @@ fn macos_capability_count_includes_restored_notifications() {
     let commands = cli_command_names();
     assert_eq!(
         commands.len(),
-        62,
+        63,
         "the published CLI command count changed; update capability documentation"
     );
 }

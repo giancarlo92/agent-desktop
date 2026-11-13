@@ -4,6 +4,7 @@
 
 ### Features
 
+* Add `agent-desktop stroke` on Windows: a left-button drag along a path of points at their times, such as a line drawn on a canvas. It takes `x,y` pairs or the JSON `path` of a recorded drag, and `--offset` for a window that moved. A recorded `drag` now carries that `path`.
 * Add `agent-desktop record` on Windows. It streams a person's own clicks, typing, combo box choices, key presses and scrolls to a JSON Lines file, naming each target by role, name and native id with its window, ancestors and a `match_count` that flags identities that would be ambiguous on replay. Password fields are recorded without their text, and input Windows marks as injected is ignored unless `--include-injected`.
 
 ### Bug Fixes

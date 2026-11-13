@@ -1,4 +1,4 @@
-mod app_window;
+﻿mod app_window;
 mod clipboard;
 mod cursor_overlay;
 mod disposition;
@@ -7,7 +7,7 @@ mod keyboard_mouse;
 mod notifications;
 mod observation;
 mod overlay_skipped;
-mod parse;
+pub(crate) mod parse;
 pub(crate) mod sandbox;
 mod session;
 mod system;
@@ -96,6 +96,7 @@ fn dispatch_command(
         Commands::Hover(args) => keyboard_mouse::hover(args, adapter, context),
         Commands::Drag(args) => keyboard_mouse::drag(args, adapter, context),
         Commands::MouseMove(args) => keyboard_mouse::mouse_move(args, adapter, context),
+        Commands::Stroke(args) => keyboard_mouse::stroke(args, adapter, context),
         Commands::MouseClick(args) => keyboard_mouse::mouse_click(args, adapter, context),
         Commands::MouseDown(args) => keyboard_mouse::mouse_down(args, adapter, context),
         Commands::MouseUp(args) => keyboard_mouse::mouse_up(args, adapter, context),

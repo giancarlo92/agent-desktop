@@ -71,6 +71,7 @@ pub mod set_value;
 pub mod skills;
 pub mod snapshot;
 pub mod status;
+pub mod stroke;
 pub(crate) mod surface_scope;
 pub mod toggle;
 pub mod trace;

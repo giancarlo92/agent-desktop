@@ -1,6 +1,7 @@
 use crate::{
     AdapterError, ClipboardContent, ClipboardFormat, Deadline, DragParams, InteractionLease,
     KeyCombo, MouseEvent, OperationReport, RecordRequest, RecordSummary, RecordedEvent,
+    StrokeParams,
 };
 
 /// Receives each event a `record` session observes, in order. An error stops
@@ -51,6 +52,16 @@ pub trait InputOps: Send + Sync {
         _lease: &InteractionLease,
     ) -> Result<OperationReport, AdapterError> {
         Err(AdapterError::not_supported("drag"))
+    }
+
+    /// Holds the left button down at the stroke's first point, moves the
+    /// pointer through its points at their times and releases it at the last.
+    fn stroke(
+        &self,
+        _params: StrokeParams,
+        _lease: &InteractionLease,
+    ) -> Result<OperationReport, AdapterError> {
+        Err(AdapterError::not_supported("stroke"))
     }
 
     fn clear_clipboard(&self, _lease: &InteractionLease) -> Result<OperationReport, AdapterError> {

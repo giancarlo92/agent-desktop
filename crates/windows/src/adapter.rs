@@ -3,7 +3,7 @@ use agent_desktop_core::{
     Deadline, DragParams, ElementState, InputOps, InteractionLease, KeyCombo, LiveElement,
     MouseEvent, NativeHandle, ObservationOps, ObservationRequest, ObservationRoot, OperationReport,
     ProcessIdentity, RecordRequest, RecordSink, RecordSummary, Rect, RefEntry, SnapshotSurface,
-    SurfaceInfo, TreeOptions, WindowFilter, WindowInfo,
+    StrokeParams, SurfaceInfo, TreeOptions, WindowFilter, WindowInfo,
 };
 use std::collections::HashSet;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -264,6 +264,16 @@ impl InputOps for WindowsAdapter {
     ) -> Result<OperationReport, AdapterError> {
         let report = OperationReport::drag_dispatched(&params);
         crate::input::drag::synthesize_drag(params, lease.deadline())?;
+        Ok(report)
+    }
+
+    fn stroke(
+        &self,
+        params: StrokeParams,
+        lease: &InteractionLease,
+    ) -> Result<OperationReport, AdapterError> {
+        let report = OperationReport::stroke_dispatched(&params);
+        crate::input::stroke::synthesize_stroke(params, lease.deadline())?;
         Ok(report)
     }
 

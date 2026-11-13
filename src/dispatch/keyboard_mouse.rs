@@ -5,6 +5,7 @@ use agent_desktop_core::{
         key_up as key_up_command, mouse_click as mouse_click_command,
         mouse_down as mouse_down_command, mouse_move as mouse_move_command,
         mouse_up as mouse_up_command, mouse_wheel as mouse_wheel_command, press as press_command,
+        stroke as stroke_command,
     },
     context::CommandContext,
 };
@@ -14,6 +15,7 @@ use crate::cli_args::{
     actions::{HoverArgs, KeyComboArgs, MouseClickArgs, MouseMoveArgs, MousePointArgs, PressArgs},
     drag::DragCliArgs,
     mouse_wheel::MouseWheelArgs,
+    stroke::StrokeArgs,
 };
 use crate::dispatch::parse::{parse_modifiers, parse_mouse_button, parse_xy, parse_xy_opt};
 
@@ -109,6 +111,15 @@ pub(super) fn mouse_move(
 ) -> Result<Value, AppError> {
     let (x, y) = parse_xy(&args.xy)?;
     mouse_move_command::execute(mouse_move_command::MouseMoveArgs { x, y }, adapter, context)
+}
+
+pub(super) fn stroke(
+    args: StrokeArgs,
+    adapter: &dyn PlatformAdapter,
+    context: &CommandContext,
+) -> Result<Value, AppError> {
+    let points = crate::cli_args::stroke::parse_points(&args)?;
+    stroke_command::execute(stroke_command::StrokeArgs { points }, adapter, context)
 }
 
 pub(super) fn mouse_click(

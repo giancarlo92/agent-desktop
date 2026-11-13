@@ -2,7 +2,7 @@ use serde_json::json;
 
 use crate::{
     ActionResult, ActionStep, DragParams, MouseEvent, MouseEventKind, OperationReport,
-    OperationTarget, StepMechanism, WindowOp, WindowReadback,
+    OperationTarget, StepMechanism, StrokeParams, WindowOp, WindowReadback,
 };
 
 impl OperationReport {
@@ -40,6 +40,20 @@ impl OperationReport {
             OperationTarget::Drag {
                 from: params.from.clone(),
                 to: params.to.clone(),
+            },
+        )
+    }
+
+    pub fn stroke_dispatched(params: &StrokeParams) -> Self {
+        let first = params.points.first().map(|p| p.point.clone());
+        let last = params.points.last().map(|p| p.point.clone());
+        let origin = crate::Point { x: 0.0, y: 0.0 };
+        Self::new(
+            ActionResult::delivered_unverified("stroke")
+                .with_steps(vec![physical_step("pointer_stroke")]),
+            OperationTarget::Drag {
+                from: first.unwrap_or_else(|| origin.clone()),
+                to: last.unwrap_or(origin),
             },
         )
     }
