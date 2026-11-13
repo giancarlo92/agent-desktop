@@ -16,6 +16,12 @@ use windows_sys::Win32::Foundation::POINT;
 use windows_sys::Win32::System::Console::GetConsoleWindow;
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, WindowFromPoint};
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+use super::record_browser::{
+    CHROMIUM_RETRIES, CHROMIUM_RETRY_GAP, address, is_bare_chromium, is_browser,
+};
 use super::record_promote::{PROMOTE_STEPS, is_actionable, is_decoration};
 use super::record_window::{
     WindowBook, contains, display_bounds, root_of_handle, window_center, window_id_of,
@@ -58,6 +64,8 @@ pub(super) struct Observer {
     app: Option<String>,
     window_id: Option<String>,
     display: Option<Rect>,
+    /// A browser window's address by window and title (a new page, a new title).
+    addresses: RefCell<HashMap<(isize, String), Option<String>>>,
 }
 
 impl Observer {
@@ -78,17 +86,32 @@ impl Observer {
             app: request.app.clone(),
             window_id: request.window_id.clone(),
             display,
+            addresses: RefCell::default(),
         })
     }
 
     pub(super) fn at_point(&mut self, x: i32, y: i32) -> Target {
-        let element = self
-            .client
-            .element_from_point(Point::new(x, y))
-            .ok()
-            .map(|element| self.actionable(UIAElement::from(element)));
+        let mut element = self.hit(x, y);
+        for _ in 0..CHROMIUM_RETRIES {
+            if !element.as_ref().is_some_and(|hit| self.bare_chromium(hit)) {
+                break;
+            }
+            std::thread::sleep(CHROMIUM_RETRY_GAP);
+            element = self.hit(x, y);
+        }
         let handle = unsafe { WindowFromPoint(POINT { x, y }) } as isize;
         self.target(element, handle, Some((x, y)))
+    }
+
+    fn hit(&self, x: i32, y: i32) -> Option<UIAElement> {
+        let found = self.client.element_from_point(Point::new(x, y)).ok()?;
+        Some(self.actionable(UIAElement::from(found)))
+    }
+
+    fn bare_chromium(&self, element: &UIAElement) -> bool {
+        let described = element_json(&read_live(element).0);
+        let class = described.get("class_name").and_then(Value::as_str);
+        is_bare_chromium(class, described.get("name").is_some())
     }
 
     /// The control a press belongs to: the hit element, or, when that is an
@@ -189,7 +212,20 @@ impl Observer {
     pub(super) fn describe(&self, target: &Target) -> Map<String, Value> {
         let mut fields = Map::new();
         if let Some(window) = &target.window {
-            fields.insert("window".into(), window_json(window));
+            let mut described = window_json(window);
+            if is_browser(&window.app) {
+                let key = (target.root, window.title.clone());
+                let url = self
+                    .addresses
+                    .borrow_mut()
+                    .entry(key)
+                    .or_insert_with(|| address(&self.client, target.root))
+                    .clone();
+                if let Some(url) = url {
+                    described["url"] = json!(url);
+                }
+            }
+            fields.insert("window".into(), described);
         }
         let Some(element) = &target.element else {
             return fields;
@@ -346,6 +382,10 @@ fn window_json(window: &WindowInfo) -> Value {
     if let Some(path) = super::record_process::image_path(window.pid.get()) {
         fields["path"] = json!(path);
     }
+    if let Some(bounds) = &window.bounds {
+        fields["bounds"] =
+            json!({"x": bounds.x, "y": bounds.y, "width": bounds.width, "height": bounds.height});
+    }
     fields
 }
 
@@ -358,6 +398,7 @@ fn element_json(properties: &ElementProperties) -> Value {
         ("name", TreeProperty::Name),
         ("native_id", TreeProperty::AutomationId),
         ("class_name", TreeProperty::ClassName),
+        ("help_text", TreeProperty::HelpText),
     ] {
         if let Some(text) = properties.get(property).non_blank_text() {
             element.insert(key.into(), json!(text));

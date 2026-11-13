@@ -10,6 +10,7 @@
 use agent_desktop_core::{AdapterError, RecordRequest, RecordSink, RecordSummary};
 
 #[cfg(target_os = "windows")]
+mod record_browser;
 mod record_copy;
 #[cfg(target_os = "windows")]
 mod record_element;

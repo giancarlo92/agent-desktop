@@ -248,7 +248,14 @@ impl<'s, 'a> Recorder<'s, 'a> {
         };
         let (from_x, from_y) = drag.from;
         self.settle_click()?;
-        let target = self.observer.at_point(x, y);
+        let mut target = self.observer.at_point(x, y);
+        for _ in 0..2 {
+            if target.element.is_some() && target.window.is_some() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            target = self.observer.at_point(x, y);
+        }
         if !self.observer.keeps(&target) {
             return Ok(());
         }
