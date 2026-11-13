@@ -53,6 +53,7 @@ pub mod press;
 pub mod query;
 pub mod record;
 pub mod record_background;
+pub mod record_display;
 pub mod resize_window;
 pub mod restore;
 pub mod right_click;

@@ -119,7 +119,7 @@ With no path, the PNG returns as base64 in `data`. `--screen` takes a display in
 
 ## list-displays
 
-Lists displays as `{ id, bounds, is_primary, scale }`, primary first. Use the array index, not `id`, with `screenshot --screen`.
+Lists displays as `{ id, number, bounds, is_primary, scale }`, primary first, `number` from 1. Use the array index, not `id`, with `screenshot --screen`; `record --display` takes the `number`, `primary` or the `id` (which can change between runs).
 
 ## list-surfaces
 

@@ -67,8 +67,8 @@ pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<
     use crate::cli_args::record::RecordAction;
     use agent_desktop_core::commands::record_background;
     match args.action {
-        Some(RecordAction::Start(start)) => {
-            record_background::start(record_background::StartArgs {
+        Some(RecordAction::Start(start)) => record_background::start(
+            record_background::StartArgs {
                 out: start.out,
                 app: start.scope.app,
                 window_id: start.scope.window_id,
@@ -77,11 +77,14 @@ pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<
                 include_injected: start.scope.include_injected,
                 video: start.video.video,
                 video_out: start.video.video_out,
-            })
-        }
+                indicator: !start.no_indicator,
+            },
+            adapter,
+        ),
         Some(RecordAction::Stop(stop)) => {
             record_background::stop(stop.id.as_deref(), stop.timeout_ms)
         }
+        Some(RecordAction::Status) => record_background::status(adapter),
         None => {
             let out = args.out.ok_or_else(|| {
                 AppError::invalid_input_with_suggestion(
@@ -104,6 +107,7 @@ pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<
                     stop_file: args.stop_file,
                     include_injected: args.scope.include_injected,
                     video,
+                    indicator: args.indicator,
                 },
                 adapter,
             )

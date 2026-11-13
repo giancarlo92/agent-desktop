@@ -207,7 +207,7 @@ Platform limits: macOS needs Screen Recording permission, and Wayland asks for p
 
 ## list-displays
 
-Lists connected displays, primary first. It takes no flags.
+Lists connected displays, primary first, each with its `number` from 1. It takes no flags. A display's `id` can change between runs; `record --display` also takes the `number` or `primary`.
 
 ```bash
 agent-desktop list-displays
@@ -219,7 +219,7 @@ agent-desktop list-displays
   "ok": true,
   "command": "list-displays",
   "data": [
-    { "bounds": { "height": 900.0, "width": 1440.0, "x": 0.0, "y": 0.0 }, "id": "screen", "is_primary": true, "scale": 1.0 }
+    { "bounds": { "height": 900.0, "width": 1440.0, "x": 0.0, "y": 0.0 }, "id": "screen", "is_primary": true, "number": 1, "scale": 1.0 }
   ]
 }
 ```

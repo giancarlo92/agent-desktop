@@ -17,7 +17,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::AppError;
+use crate::adapter::PlatformAdapter;
 use crate::commands::record::{RECORDING_READY_KIND, default_video_path};
+use crate::commands::record_display;
 
 const READY_TIMEOUT: Duration = Duration::from_secs(20);
 const POLL: Duration = Duration::from_millis(100);
@@ -34,6 +36,8 @@ pub struct StartArgs {
     pub include_injected: bool,
     pub video: bool,
     pub video_out: Option<PathBuf>,
+    /// Show the on-screen recording indicator, with its Stop button.
+    pub indicator: bool,
 }
 
 /// A recording running in the background.
@@ -44,9 +48,24 @@ pub struct Session {
     pub out: PathBuf,
     pub video: Option<PathBuf>,
     pub stop_file: PathBuf,
+    /// When it started, in milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub started_ms: u64,
+    /// What it records: `window <id>`, `app <name>`, `display <id>` or `everything`.
+    #[serde(default)]
+    pub scope: String,
 }
 
-pub fn start(args: StartArgs) -> Result<Value, AppError> {
+pub fn start(mut args: StartArgs, adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
+    let display = match &args.display {
+        Some(selector) => {
+            let displays = adapter.list_displays(crate::Deadline::standard()?)?;
+            let chosen = record_display::resolve(selector, &displays)?;
+            args.display = Some(chosen.id.clone());
+            Some(record_display::describe(&displays, chosen))
+        }
+        None => None,
+    };
     let dir = sessions_dir()?;
     let id = new_id(&dir);
     let out = args
@@ -64,6 +83,8 @@ pub fn start(args: StartArgs) -> Result<Value, AppError> {
         stop_file: dir.join(format!("{id}.stop")),
         out,
         video,
+        started_ms: now_ms(),
+        scope: scope_of(&args),
     };
     let log = dir.join(format!("{id}.log"));
     let mut child = match spawn(&args, &session, &log, true) {
@@ -96,13 +117,64 @@ pub fn start(args: StartArgs) -> Result<Value, AppError> {
         }
         std::thread::sleep(POLL);
     }
-    Ok(json!({
+    let mut result = json!({
         "id": session.id,
         "state": "recording",
         "pid": session.pid,
+        "scope": session.scope,
         "out": session.out.to_string_lossy(),
         "video": session.video.as_ref().map(|p| p.to_string_lossy().into_owned()),
-    }))
+        "indicator": args.indicator,
+    });
+    if let Some(display) = display {
+        result["display"] = display;
+    }
+    Ok(result)
+}
+
+/// The recordings running in the background and the displays there are to
+/// record, for a person or an agent deciding what to do.
+pub fn status(adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
+    let dir = sessions_dir()?;
+    let now = now_ms();
+    let recordings: Vec<Value> = sessions(&dir)
+        .into_iter()
+        .map(|session| {
+            let running = alive(session.pid);
+            json!({
+                "id": session.id,
+                "state": if running { "recording" } else { "ended" },
+                "scope": session.scope,
+                "elapsed_ms": now.saturating_sub(session.started_ms),
+                "out": session.out.to_string_lossy(),
+                "video": session.video.as_ref().map(|p| p.to_string_lossy().into_owned()),
+            })
+        })
+        .collect();
+    let displays = adapter
+        .list_displays(crate::Deadline::standard()?)
+        .map(|displays| record_display::numbered(&displays))
+        .unwrap_or(Value::Array(Vec::new()));
+    Ok(json!({ "recording": recordings, "displays": displays }))
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+pub(crate) fn scope_of(args: &StartArgs) -> String {
+    if let Some(id) = &args.window_id {
+        format!("window {id}")
+    } else if let Some(app) = &args.app {
+        format!("app {app}")
+    } else if let Some(display) = &args.display {
+        format!("display {display}")
+    } else {
+        "everything".into()
+    }
 }
 
 pub fn stop(id: Option<&str>, timeout_ms: Option<u64>) -> Result<Value, AppError> {
@@ -233,6 +305,9 @@ fn spawn(
     if let Some(video) = &session.video {
         argv.push("--video-out".into());
         argv.push(video.clone().into());
+    }
+    if args.indicator {
+        argv.push("--indicator".into());
     }
     let log_file = std::fs::File::create(log).map_err(AppError::Io)?;
     let mut command = std::process::Command::new(exe);

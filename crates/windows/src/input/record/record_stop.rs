@@ -9,6 +9,12 @@ use windows_sys::Win32::Foundation::{FALSE, TRUE};
 use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
 
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Ends the session as soon as the stop watch looks: the indicator's Stop.
+pub(super) fn request_stop() {
+    STOP_REQUESTED.store(true, Ordering::SeqCst);
+}
 
 const STOP_FILE_POLL: Duration = Duration::from_millis(200);
 
@@ -27,6 +33,7 @@ pub(super) struct InterruptGuard {
 impl InterruptGuard {
     pub(super) fn install() -> Self {
         INTERRUPTED.store(false, Ordering::SeqCst);
+        STOP_REQUESTED.store(false, Ordering::SeqCst);
         let installed = unsafe { SetConsoleCtrlHandler(Some(on_console_control), TRUE) } != 0;
         Self { installed }
     }
@@ -82,6 +89,9 @@ impl StopWatch {
     pub(super) fn reason(&mut self, now: Instant) -> Option<&'static str> {
         if INTERRUPTED.load(Ordering::SeqCst) {
             return Some("interrupted");
+        }
+        if STOP_REQUESTED.load(Ordering::SeqCst) {
+            return Some("indicator");
         }
         if now >= self.next_file_check {
             self.next_file_check = now + STOP_FILE_POLL;

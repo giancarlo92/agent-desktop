@@ -74,6 +74,7 @@ fn args(out: PathBuf) -> RecordArgs {
         stop_file: None,
         include_injected: false,
         video: None,
+        indicator: false,
     }
 }
 

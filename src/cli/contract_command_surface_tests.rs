@@ -20,6 +20,7 @@ const NON_COMMAND_MODULES: &[&str] = &[
     "post_action_observation",
     "query",
     "record_background",
+    "record_display",
     "find_live_test_support",
     "sandbox_action",
     "sandbox_install",

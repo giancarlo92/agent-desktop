@@ -19,4 +19,7 @@ pub struct RecordRequest {
     /// Where to write an MP4 video of the recorded area (the window, the
     /// display, or the display an app is on), when one is asked for.
     pub video: Option<PathBuf>,
+    /// Show a small always-on-top indicator while recording, with a Stop
+    /// button that ends the session (`stop_reason: "indicator"`).
+    pub indicator: bool,
 }

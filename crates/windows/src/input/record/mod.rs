@@ -20,6 +20,7 @@ mod record_followup;
 mod record_gesture;
 #[cfg(target_os = "windows")]
 mod record_hook;
+mod record_indicator;
 #[cfg(target_os = "windows")]
 mod record_keys;
 mod record_label;

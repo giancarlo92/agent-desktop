@@ -2,7 +2,8 @@ use serde::Serialize;
 
 /// How a `record` session ended.
 ///
-/// `stop_reason` is `interrupted`, `stop_file` or `max_duration`.
+/// `stop_reason` is `interrupted`, `stop_file`, `max_duration` or
+/// `indicator` (the person pressed Stop on the on-screen indicator).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RecordSummary {
     pub duration_ms: u64,

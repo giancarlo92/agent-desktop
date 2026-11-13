@@ -34,6 +34,8 @@ fn session(id: &str) -> Session {
         out: PathBuf::from(format!("{id}.jsonl")),
         video: None,
         stop_file: PathBuf::from(format!("{id}.stop")),
+        started_ms: 0,
+        scope: "everything".into(),
     }
 }
 
@@ -79,4 +81,24 @@ fn the_trailer_is_read_from_the_last_matching_line() {
     assert!(has_line(&path, RECORDING_READY_KIND));
     let trailer = last_line_of_kind(&path, "recording_stopped").unwrap();
     assert_eq!(trailer["events"], 1);
+}
+
+#[test]
+fn a_session_says_what_it_records() {
+    let mut args = StartArgs {
+        out: None,
+        app: None,
+        window_id: None,
+        display: None,
+        max_duration_ms: None,
+        include_injected: false,
+        video: false,
+        video_out: None,
+        indicator: true,
+    };
+    assert_eq!(scope_of(&args), "everything");
+    args.display = Some("monitor-1".into());
+    assert_eq!(scope_of(&args), "display monitor-1");
+    args.window_id = Some("w-7".into());
+    assert_eq!(scope_of(&args), "window w-7");
 }

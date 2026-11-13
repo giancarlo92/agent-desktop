@@ -19,6 +19,11 @@ pub(crate) struct RecordArgs {
     pub stop_file: Option<PathBuf>,
     #[command(flatten)]
     pub video: RecordVideo,
+    #[arg(
+        long,
+        help = "Show an on-screen indicator while recording, with a Stop button (Windows)"
+    )]
+    pub indicator: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -29,6 +34,10 @@ pub(crate) enum RecordAction {
     Start(RecordStartArgs),
     #[command(about = "Stop a background recording and return its summary")]
     Stop(RecordStopArgs),
+    #[command(
+        about = "Show the background recordings and the displays there are to record (with their numbers)"
+    )]
+    Status,
 }
 
 #[derive(Args, Debug)]
@@ -42,6 +51,11 @@ pub(crate) struct RecordStartArgs {
     pub scope: RecordScope,
     #[command(flatten)]
     pub video: RecordVideo,
+    #[arg(
+        long,
+        help = "Do not show the on-screen recording indicator and its Stop button"
+    )]
+    pub no_indicator: bool,
 }
 
 #[derive(Args, Debug)]
@@ -69,7 +83,7 @@ pub(crate) struct RecordScope {
     pub window_id: Option<String>,
     #[arg(
         long,
-        help = "Keep only actions on this display (an id from list-displays)"
+        help = "Keep only actions on this display: primary, its number in list-displays (1, 2, ...) or its id"
     )]
     pub display: Option<String>,
     #[arg(

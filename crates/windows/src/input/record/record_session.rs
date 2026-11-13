@@ -21,6 +21,7 @@ use super::record_gesture::{
     wheel_step,
 };
 use super::record_hook::{self, RawInput};
+use super::record_indicator::Indicator;
 use super::record_keys::{KeyClass, ModifierState, classify, key_name};
 use super::record_stop::{InterruptGuard, StopWatch};
 use super::record_text::typed_text;
@@ -46,6 +47,11 @@ pub(super) fn run(
         Some(path) => Some(VideoRecorder::start(path, area_for(request)?, started)?),
         None => None,
     };
+    let indicator = request
+        .indicator
+        .then(|| area_for(request).ok())
+        .flatten()
+        .map(|area| Indicator::show(area, started));
     let mut recorder = Recorder::new(observer, started, sink);
     recorder.emit(RECORDING_READY_KIND, Instant::now(), Map::new())?;
     let stop_reason = loop {
@@ -60,6 +66,7 @@ pub(super) fn run(
         recorder.tick(Instant::now())?;
     };
     drop(hooks);
+    drop(indicator);
     while let Ok(input) = inputs.try_recv() {
         recorder.handle(input)?;
     }

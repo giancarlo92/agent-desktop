@@ -28,6 +28,8 @@ pub struct RecordArgs {
     pub include_injected: bool,
     /// The MP4 video to write beside the events; `None` records no video.
     pub video: Option<PathBuf>,
+    /// Show the on-screen recording indicator, with its Stop button.
+    pub indicator: bool,
 }
 
 /// Streams the session to `args.out` as JSON lines: a `recording_started`
@@ -35,7 +37,18 @@ pub struct RecordArgs {
 /// Each line is flushed as it is written, so an interrupted process still
 /// leaves every action it saw on disk.
 pub fn execute(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
-    let request = record_request(&args)?;
+    let mut request = record_request(&args)?;
+    let display = match &args.display {
+        Some(selector) => match adapter.list_displays(crate::Deadline::standard()?) {
+            Ok(displays) => {
+                let chosen = crate::commands::record_display::resolve(selector, &displays)?;
+                request.display = Some(chosen.id.clone());
+                Some(crate::commands::record_display::describe(&displays, chosen))
+            }
+            Err(_) => None,
+        },
+        None => None,
+    };
     let mut writer = open_recording(&args.out)?;
     let started = write_line(&mut writer, &header(&request));
     if let Err(error) = started {
@@ -69,6 +82,9 @@ pub fn execute(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
     });
     if let Some(video) = &summary.video {
         result["video"] = json!(video);
+    }
+    if let Some(display) = display {
+        result["display"] = display;
     }
     Ok(result)
 }
@@ -113,6 +129,7 @@ fn record_request(args: &RecordArgs) -> Result<RecordRequest, AppError> {
         stop_file: args.stop_file.clone(),
         include_injected: args.include_injected,
         video: args.video.clone(),
+        indicator: args.indicator,
     })
 }
 
