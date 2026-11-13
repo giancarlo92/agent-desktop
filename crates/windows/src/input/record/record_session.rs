@@ -250,7 +250,7 @@ impl<'s, 'a> Recorder<'s, 'a> {
         self.settle_click()?;
         let mut target = self.observer.at_point(x, y);
         for _ in 0..2 {
-            if target.element.is_some() && target.window.is_some() {
+            if !self.observer.blank(&target) && target.window.is_some() {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(150));

@@ -22,6 +22,7 @@ mod record_gesture;
 mod record_hook;
 #[cfg(target_os = "windows")]
 mod record_keys;
+mod record_label;
 #[cfg(target_os = "windows")]
 mod record_process;
 mod record_promote;

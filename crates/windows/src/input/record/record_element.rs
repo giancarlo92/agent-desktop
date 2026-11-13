@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use super::record_browser::{
     CHROMIUM_RETRIES, CHROMIUM_RETRY_GAP, address, is_bare_chromium, is_browser,
 };
+use super::record_label::{is_field_role, nearby_label};
 use super::record_promote::{PROMOTE_STEPS, is_actionable, is_decoration};
 use super::record_window::{
     WindowBook, contains, display_bounds, root_of_handle, window_center, window_id_of,
@@ -209,6 +210,15 @@ impl Observer {
             .unwrap_or(false)
     }
 
+    /// Whether a target has no element that answers: none, or one whose
+    /// properties all failed (it was replaced as the pointer was released).
+    pub(super) fn blank(&self, target: &Target) -> bool {
+        target
+            .element
+            .as_ref()
+            .is_none_or(|element| element_json(&read_live(element).0).get("role").is_none())
+    }
+
     pub(super) fn describe(&self, target: &Target) -> Map<String, Value> {
         let mut fields = Map::new();
         if let Some(window) = &target.window {
@@ -231,7 +241,20 @@ impl Observer {
             return fields;
         };
         let (properties, _) = read_live(element);
-        fields.insert("element".into(), element_json(&properties));
+        let mut described = element_json(&properties);
+        let unnamed = ["name", "native_id", "help_text"]
+            .iter()
+            .all(|key| described.get(*key).is_none())
+            && described
+                .get("role")
+                .and_then(Value::as_str)
+                .is_some_and(is_field_role);
+        if let (true, Some(walker)) = (unnamed, self.walker.as_ref()) {
+            if let Some(label) = nearby_label(walker, &element.0) {
+                described["label"] = json!(label);
+            }
+        }
+        fields.insert("element".into(), described);
         let ancestors = self.ancestors(element);
         if !ancestors.is_empty() {
             fields.insert("ancestors".into(), Value::Array(ancestors));
