@@ -170,12 +170,37 @@ pub(super) fn system_drag_slop() -> (i32, i32) {
     (x.max(1), y.max(1))
 }
 
-/// Pairs a left press with its release. A release far enough from the press
-/// is a drag: selecting a range of cells or text, or moving something.
+/// The most points a drag's path keeps. A longer stroke is thinned to every
+/// other point, so its whole shape stays, at a coarser step.
+const PATH_LIMIT: usize = 2048;
+
+/// One point of a drag's path: where the pointer was and how many
+/// milliseconds after the press.
+pub(super) type PathPoint = (i32, i32, u64);
+
+/// A finished drag: where the press was and the way the pointer went, from
+/// the press to the release.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct Drag {
+    pub(super) from: (i32, i32),
+    pub(super) path: Vec<PathPoint>,
+}
+
+#[derive(Debug)]
+struct Press {
+    at: Instant,
+    path: Vec<PathPoint>,
+    step: i32,
+}
+
+/// Pairs a left press with its release. A release far enough from the press,
+/// or a pointer that went far before coming back, is a drag: selecting a
+/// range of cells or text, moving something, or a stroke drawn on a canvas,
+/// which only its path can replay.
 #[derive(Debug)]
 pub(super) struct DragTracker {
     slop: (i32, i32),
-    pressed: Option<(i32, i32)>,
+    pressed: Option<Press>,
 }
 
 impl DragTracker {
@@ -186,15 +211,58 @@ impl DragTracker {
         }
     }
 
-    pub(super) fn press(&mut self, x: i32, y: i32) {
-        self.pressed = Some((x, y));
+    pub(super) fn press(&mut self, x: i32, y: i32, at: Instant) {
+        self.pressed = Some(Press {
+            at,
+            path: vec![(x, y, 0)],
+            step: 1,
+        });
     }
 
-    /// The point the drag started at, when this release ends one.
-    pub(super) fn release(&mut self, x: i32, y: i32) -> Option<(i32, i32)> {
-        let (from_x, from_y) = self.pressed.take()?;
-        let moved = (x - from_x).abs() > self.slop.0 || (y - from_y).abs() > self.slop.1;
-        moved.then_some((from_x, from_y))
+    /// The pointer moved with the left button down.
+    pub(super) fn motion(&mut self, x: i32, y: i32, at: Instant) {
+        let Some(press) = self.pressed.as_mut() else {
+            return;
+        };
+        let Some(&(last_x, last_y, _)) = press.path.last() else {
+            return;
+        };
+        if (x - last_x).abs().max((y - last_y).abs()) < press.step {
+            return;
+        }
+        if press.path.len() >= PATH_LIMIT {
+            let mut index = 0;
+            press.path.retain(|_| {
+                index += 1;
+                index % 2 == 1
+            });
+            press.step *= 2;
+        }
+        let ms = at.saturating_duration_since(press.at).as_millis() as u64;
+        press.path.push((x, y, ms));
+    }
+
+    /// The drag this release ends, or `None` for a click.
+    pub(super) fn release(&mut self, x: i32, y: i32, at: Instant) -> Option<Drag> {
+        let mut press = self.pressed.take()?;
+        let (from_x, from_y, _) = press.path[0];
+        let slop = self.slop;
+        let far = |px: i32, py: i32| (px - from_x).abs() > slop.0 || (py - from_y).abs() > slop.1;
+        if !far(x, y) && !press.path.iter().any(|&(px, py, _)| far(px, py)) {
+            return None;
+        }
+        let ms = at.saturating_duration_since(press.at).as_millis() as u64;
+        if press
+            .path
+            .last()
+            .is_none_or(|&(lx, ly, _)| (lx, ly) != (x, y))
+        {
+            press.path.push((x, y, ms));
+        }
+        Some(Drag {
+            from: (from_x, from_y),
+            path: press.path,
+        })
     }
 }
 

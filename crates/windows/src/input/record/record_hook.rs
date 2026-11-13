@@ -25,6 +25,7 @@ const WM_KEYDOWN: u32 = 0x0100;
 const WM_KEYUP: u32 = 0x0101;
 const WM_SYSKEYDOWN: u32 = 0x0104;
 const WM_SYSKEYUP: u32 = 0x0105;
+const WM_MOUSEMOVE: u32 = 0x0200;
 const WM_LBUTTONDOWN: u32 = 0x0201;
 const WM_LBUTTONUP: u32 = 0x0202;
 const WM_RBUTTONDOWN: u32 = 0x0204;
@@ -47,6 +48,8 @@ pub(super) enum RawInput {
     },
     /// The left button went up: with its press, it tells a drag from a click.
     Release { x: i32, y: i32, at: Instant },
+    /// The pointer moved while the left button was down: a drag's path.
+    Move { x: i32, y: i32, at: Instant },
     Wheel {
         delta: i16,
         horizontal: bool,
@@ -68,6 +71,7 @@ pub(super) enum RawInput {
 thread_local! {
     static SENDER: RefCell<Option<Sender<RawInput>>> = const { RefCell::new(None) };
     static KEEP_INJECTED: Cell<bool> = const { Cell::new(false) };
+    static LEFT_DOWN: Cell<bool> = const { Cell::new(false) };
 }
 
 fn forward(input: RawInput) {
@@ -94,10 +98,21 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
 fn mouse_input(message: u32, info: &MSLLHOOKSTRUCT) -> Option<RawInput> {
     let (x, y, at) = (info.pt.x, info.pt.y, Instant::now());
     let button = match message {
-        WM_LBUTTONDOWN => "left",
+        WM_MOUSEMOVE => {
+            return LEFT_DOWN
+                .with(Cell::get)
+                .then_some(RawInput::Move { x, y, at });
+        }
+        WM_LBUTTONDOWN => {
+            LEFT_DOWN.with(|down| down.set(true));
+            "left"
+        }
         WM_RBUTTONDOWN => "right",
         WM_MBUTTONDOWN => "middle",
-        WM_LBUTTONUP => return Some(RawInput::Release { x, y, at }),
+        WM_LBUTTONUP => {
+            LEFT_DOWN.with(|down| down.set(false));
+            return Some(RawInput::Release { x, y, at });
+        }
         WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
             return Some(RawInput::Wheel {
                 delta: (info.mouseData >> 16) as u16 as i16,

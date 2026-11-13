@@ -103,6 +103,10 @@ impl<'s, 'a> Recorder<'s, 'a> {
     }
 
     fn handle(&mut self, input: RawInput) -> Result<(), AdapterError> {
+        if let RawInput::Move { x, y, at } = input {
+            self.drags.motion(x, y, at);
+            return Ok(());
+        }
         self.settle_click()?;
         self.poll_choice(Instant::now())?;
         match input {
@@ -111,6 +115,7 @@ impl<'s, 'a> Recorder<'s, 'a> {
                 self.on_button(button, x, y, at)
             }
             RawInput::Release { x, y, at } => self.on_release(x, y, at),
+            RawInput::Move { .. } => Ok(()),
             RawInput::Wheel {
                 delta,
                 horizontal,
@@ -205,7 +210,7 @@ impl<'s, 'a> Recorder<'s, 'a> {
             self.emit_scroll(run)?;
         }
         if button == "left" {
-            self.drags.press(x, y);
+            self.drags.press(x, y, at);
         }
         let target = self.observer.at_point(x, y);
         let count = self.clicks.register(button, x, y, at);
@@ -235,9 +240,10 @@ impl<'s, 'a> Recorder<'s, 'a> {
     /// element is read now, so its name and state show what the drag left
     /// (a grid names the range it selected).
     fn on_release(&mut self, x: i32, y: i32, at: Instant) -> Result<(), AdapterError> {
-        let Some((from_x, from_y)) = self.drags.release(x, y) else {
+        let Some(drag) = self.drags.release(x, y, at) else {
             return Ok(());
         };
+        let (from_x, from_y) = drag.from;
         self.settle_click()?;
         let target = self.observer.at_point(x, y);
         if !self.observer.keeps(&target) {
@@ -246,6 +252,8 @@ impl<'s, 'a> Recorder<'s, 'a> {
         let mut fields = self.observer.describe(&target);
         fields.insert("from".into(), json!({"x": from_x, "y": from_y}));
         fields.insert("point".into(), json!({"x": x, "y": y}));
+        let path = drag.path.iter().map(|&(px, py, ms)| json!([px, py, ms]));
+        fields.insert("path".into(), Value::Array(path.collect()));
         self.emit("drag", at, fields)
     }
 
