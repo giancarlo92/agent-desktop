@@ -23,6 +23,7 @@ mod record_hook;
 mod record_keys;
 #[cfg(target_os = "windows")]
 mod record_process;
+mod record_promote;
 #[cfg(target_os = "windows")]
 mod record_session;
 #[cfg(target_os = "windows")]

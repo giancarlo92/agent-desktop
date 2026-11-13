@@ -66,6 +66,9 @@ pub(super) fn run(
 
 struct PendingText {
     target: Target,
+    /// The field as it was when typing started: a dialog that closes on the
+    /// commit key (a file name box) no longer answers when the text is flushed.
+    evidence: Map<String, Value>,
     typed: String,
     exact: bool,
     started: Instant,
@@ -330,14 +333,21 @@ impl<'s, 'a> Recorder<'s, 'a> {
             KeyClass::Text => typed_text(vk, scan, &self.modifiers),
             _ => None,
         };
-        let pending = self.pending.get_or_insert_with(|| PendingText {
-            target,
-            typed: String::new(),
-            exact: true,
-            started: at,
-            last_key: at,
-            settled: None,
-        });
+        if self.pending.is_none() {
+            let evidence = self.observer.describe(&target);
+            self.pending = Some(PendingText {
+                target,
+                evidence,
+                typed: String::new(),
+                exact: true,
+                started: at,
+                last_key: at,
+                settled: None,
+            });
+        }
+        let Some(pending) = self.pending.as_mut() else {
+            return Ok(());
+        };
         match (class, text) {
             (KeyClass::Text, Some(text)) => pending.typed.push_str(&text),
             (KeyClass::Text, None) => {}
@@ -373,7 +383,7 @@ impl<'s, 'a> Recorder<'s, 'a> {
                     self.observer.value(element)
                 }),
         };
-        let mut fields = self.observer.describe(&pending.target);
+        let mut fields = pending.evidence;
         match value {
             FieldValue::Secret => {
                 fields.insert("secure".into(), json!(true));

@@ -16,6 +16,7 @@ use windows_sys::Win32::Foundation::POINT;
 use windows_sys::Win32::System::Console::GetConsoleWindow;
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, WindowFromPoint};
 
+use super::record_promote::{PROMOTE_STEPS, is_actionable, is_decoration};
 use super::record_window::{
     WindowBook, contains, display_bounds, root_of_handle, window_center, window_id_of,
 };
@@ -85,9 +86,39 @@ impl Observer {
             .client
             .element_from_point(Point::new(x, y))
             .ok()
-            .map(UIAElement::from);
+            .map(|element| self.actionable(UIAElement::from(element)));
         let handle = unsafe { WindowFromPoint(POINT { x, y }) } as isize;
         self.target(element, handle, Some((x, y)))
+    }
+
+    /// The control a press belongs to: the hit element, or, when that is an
+    /// unnamed icon or caption drawn inside a control, the nearest actionable
+    /// ancestor a few levels up (see `record_promote`).
+    fn actionable(&self, element: UIAElement) -> UIAElement {
+        let described = element_json(&read_live(&element).0);
+        let role = described.get("role").and_then(Value::as_str);
+        if !is_decoration(role, described.get("name").is_some()) {
+            return element;
+        }
+        let Some(walker) = self.walker.as_ref() else {
+            return element;
+        };
+        let mut current = element.0.clone();
+        for _ in 0..PROMOTE_STEPS {
+            let Ok(parent) = walker.get_parent(&current) else {
+                break;
+            };
+            let parent_json = element_json(&read_live(&UIAElement::from(parent.clone())).0);
+            let parent_role = parent_json.get("role").and_then(Value::as_str);
+            if parent_role == Some("window") {
+                break;
+            }
+            if is_actionable(parent_role) {
+                return UIAElement::from(parent);
+            }
+            current = parent;
+        }
+        element
     }
 
     pub(super) fn focused(&mut self) -> Target {
