@@ -66,7 +66,10 @@ pub fn start(args: StartArgs) -> Result<Value, AppError> {
         video,
     };
     let log = dir.join(format!("{id}.log"));
-    let mut child = spawn(&args, &session, &log)?;
+    let mut child = match spawn(&args, &session, &log, true) {
+        Ok(child) => child,
+        Err(_) => spawn(&args, &session, &log, false)?,
+    };
     let session = Session {
         pid: child.id(),
         ..session
@@ -114,6 +117,25 @@ pub fn stop(id: Option<&str>, timeout_ms: Option<u64>) -> Result<Value, AppError
     let trailer = loop {
         if let Some(line) = last_line_of_kind(&session.out, "recording_stopped") {
             break line;
+        }
+        if !alive(session.pid) {
+            let actions = count_actions(&session.out);
+            let _ = std::fs::remove_file(&session.stop_file);
+            let _ = std::fs::remove_file(state_path(&dir, &session.id));
+            let _ = std::fs::remove_file(dir.join(format!("{}.log", session.id)));
+            return Err(AppError::invalid_input_with_suggestion(
+                format!(
+                    "Recording {} ended before it was stopped (its process was closed); {actions} actions were kept in {}{}",
+                    session.id,
+                    session.out.display(),
+                    session
+                        .video
+                        .as_ref()
+                        .map(|v| format!(", and the video up to that moment in {}", v.display()))
+                        .unwrap_or_default()
+                ),
+                "Start it again with record start",
+            ));
         }
         if Instant::now() >= deadline {
             return Err(AppError::Internal(format!(
@@ -177,7 +199,12 @@ fn ids(running: &[Session]) -> String {
     }
 }
 
-fn spawn(args: &StartArgs, session: &Session, log: &Path) -> Result<std::process::Child, AppError> {
+fn spawn(
+    args: &StartArgs,
+    session: &Session,
+    log: &Path,
+    breakaway: bool,
+) -> Result<std::process::Child, AppError> {
     let exe = std::env::current_exe().map_err(AppError::Io)?;
     let mut argv: Vec<std::ffi::OsString> = vec![
         "record".into(),
@@ -214,7 +241,7 @@ fn spawn(args: &StartArgs, session: &Session, log: &Path) -> Result<std::process
         .stdin(std::process::Stdio::null())
         .stdout(log_file.try_clone().map_err(AppError::Io)?)
         .stderr(log_file);
-    detach(&mut command);
+    detach(&mut command, breakaway);
     command.spawn().map_err(AppError::Io)
 }
 
@@ -223,8 +250,11 @@ fn spawn(args: &StartArgs, session: &Session, log: &Path) -> Result<std::process
 /// this command's output, an MCP client) are inheritable: a child holding
 /// them would keep the caller waiting until the recording ends. They are
 /// made non-inheritable first; the child gets only its log and no input.
+/// A caller that runs its tools in a job closed with it (an agent CLI that
+/// ends after each turn) would kill the session too, so the child breaks
+/// away from the job; `start` retries without that when the job forbids it.
 #[cfg(target_os = "windows")]
-fn detach(command: &mut std::process::Command) {
+fn detach(command: &mut std::process::Command, breakaway: bool) {
     use std::os::windows::process::CommandExt;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
@@ -241,11 +271,43 @@ fn detach(command: &mut std::process::Command) {
             unsafe { SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0) };
         }
     }
-    command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+    let job = if breakaway {
+        CREATE_BREAKAWAY_FROM_JOB
+    } else {
+        0
+    };
+    command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | job);
 }
 
 #[cfg(not(target_os = "windows"))]
-fn detach(_command: &mut std::process::Command) {}
+fn detach(_command: &mut std::process::Command, _breakaway: bool) {}
+
+/// Whether the session's process still runs.
+#[cfg(target_os = "windows")]
+pub(crate) fn alive(pid: u32) -> bool {
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    const STILL_ACTIVE: u32 = 259;
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+        fn GetExitCodeProcess(process: *mut std::ffi::c_void, code: *mut u32) -> i32;
+        fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
+    }
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if process.is_null() {
+        return false;
+    }
+    let mut code = 0;
+    let read = unsafe { GetExitCodeProcess(process, &mut code) } != 0;
+    unsafe { CloseHandle(process) };
+    read && code == STILL_ACTIVE
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn alive(pid: u32) -> bool {
+    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+}
 
 fn sessions_dir() -> Result<PathBuf, AppError> {
     let dir = crate::storage::state_root::resolve_configured_state_root()?.join("recordings");
@@ -289,6 +351,19 @@ pub(crate) fn new_id(dir: &Path) -> String {
         id = format!("rec-{stamp}-{n}");
     }
     id
+}
+
+fn count_actions(path: &Path) -> usize {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    text.lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|line| {
+            !matches!(
+                line.get("kind").and_then(Value::as_str),
+                Some("recording_started" | "recording_ready" | "recording_stopped") | None
+            )
+        })
+        .count()
 }
 
 fn has_line(path: &Path, kind: &str) -> bool {

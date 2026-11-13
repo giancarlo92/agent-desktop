@@ -160,6 +160,15 @@ Records what a person does, not what you do: it observes their clicks, typing, c
 
 Each action line carries `kind`, `t_ms`, `window` and, when UI Automation answers, `element` (`role`, `name`, `native_id`), `ancestors` and `match_count`. Replay it with ordinary commands: find each `element` by `native_id` (or `role` plus `name`) inside the recorded window, then `set-value` a `type` line's `value`, `select` a `select` line's `value`, `check`/`uncheck` a `click` from `state_after.checked`, `click` other clicks, `press` a `press` line's `keys` and `scroll` a `scroll` line. A `type` line with `secure: true` carries no text; ask for the secret. Skip a `click` whose `element.role` is still a container (`group`, `document`, `pane`). A `match_count` above 1 needs `ancestors` to disambiguate. A `drag` on a canvas (no `element` name) is replayed with `stroke --path-file` from its `path`; a web action carries `window.url`, and a field with no name carries `help_text` or `label`.
 
+### Recording a person's task for them
+
+When a person asks you to record what they do (with or without a video), the session runs in the background between two calls (MCP: `desktop_record_start`, `desktop_record_stop`):
+
+1. Ask what to record, unless they said: one window, one app, or one display. Run `list-displays` when they have more than one screen and let them pick; never default to every screen. A narrow scope also keeps the chat you talk in out of the recording.
+2. Start it with `record start` and that scope, `--video` if they want a video, and `--video-out` (an `.mp4` path) if they named where to save it. Tell them it is recording, what it records and where the files go, and that you stop it when they say they are done. Do not act on their desktop while it records: your own input is ignored unless `--include-injected`, but it would still appear in the video.
+3. When they say they are done, run `record stop` (with `--id` if you started more than one) and give them `out` and `video.path`. The session also stops by itself after `--max-duration-ms` (default 10 minutes); `record stop` still returns its summary. If `record stop` says the session ended before it was stopped, your client closed it when a turn ended: the video plays up to that moment; start again, or keep start and stop in one conversation. If it reports 0 events although the person acted (the video shows it), their input was synthetic (another automation tool, a remote session) and was ignored: start again with `--include-injected`.
+4. To turn the recording into a script they can replay, read the `out` file: each line is one action with the element it targeted (see below), and `video.offset_ms` maps an action's `t_ms` to the video. Ask which typed values should become parameters.
+
 ## batch
 
 ```bash

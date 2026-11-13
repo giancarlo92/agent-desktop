@@ -4,6 +4,8 @@
 //! pointer on it, and writes each frame to an H.264 MP4 through a Media
 //! Foundation sink writer. Each frame carries the time it was taken, so the
 //! video and the recording's `t_ms` share one clock (`offset_ms` apart).
+//! The MP4 is fragmented, so a session that is killed (its caller's
+//! process tree closed) still leaves a playable video up to that moment.
 //! GDI reads the composed screen, so the video shows what the person saw
 //! without the border a Windows Graphics Capture session draws.
 
@@ -157,11 +159,17 @@ impl Encoder {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
             MFStartup(MF_VERSION, MFSTARTUP_FULL).map_err(mf("start Media Foundation"))?;
             let mut attributes = None;
-            MFCreateAttributes(&mut attributes, 1).map_err(mf("create attributes"))?;
+            MFCreateAttributes(&mut attributes, 2).map_err(mf("create attributes"))?;
             let attributes = attributes.ok_or_else(|| video_error("no attributes".into()))?;
             attributes
                 .SetUINT32(&MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, 1)
                 .map_err(mf("ask for hardware encoding"))?;
+            attributes
+                .SetGUID(
+                    &MF_TRANSCODE_CONTAINERTYPE,
+                    &MFTranscodeContainerType_FMPEG4,
+                )
+                .map_err(mf("ask for a fragmented MP4"))?;
             let writer = MFCreateSinkWriterFromURL(&url, None, &attributes)
                 .map_err(mf("create the video file"))?;
             let frame_size = (u64::from(width) << 32) | u64::from(height);
