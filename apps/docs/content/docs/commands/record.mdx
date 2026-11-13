@@ -1,7 +1,7 @@
 ---
 title: record
 navTitle: Recording
-description: Reference for the record command, which streams a person's own clicks, typing, choices, key presses and scrolls to a JSON Lines file with the accessibility identity of every target.
+description: Reference for the record command, which streams a person's own clicks, drags, typing, choices, key presses and scrolls to a JSON Lines file with the accessibility identity of every target.
 ---
 
 `record` watches what a person does in a window and writes one JSON line per action. Each line names the element the action targeted by its role, name and native id, the same evidence `find` and the ref commands use, so a recording can be replayed with ordinary commands. `record` only observes: it sends no input and takes no interaction lease. It runs on Windows; macOS and Linux return `PLATFORM_NOT_SUPPORTED`.
@@ -41,7 +41,7 @@ The envelope is printed once, when the session ends:
 
 ## The recording file
 
-The first line is `recording_started` with the session parameters, then `recording_ready`, then one line per action, and `recording_stopped` last. Every action line has `kind`, `t_ms` (milliseconds since the session started), `window` (`id`, `title`, `app_name`, `pid`) and, when UI Automation answers, `element` (`role`, `name`, `native_id`, `class_name`, `bounds`), up to six `ancestors` with a name or native id, and `match_count`: how many elements in the same top-level window share the element's control type and identity. A `match_count` above 1 means the identity alone is ambiguous on replay and the ancestors are needed.
+The first line is `recording_started` with the session parameters, then `recording_ready`, then one line per action, and `recording_stopped` last. Every action line has `kind`, `t_ms` (milliseconds since the session started), `window` (`id`, `title`, `app_name`, `pid`, and `path`: the app's executable, read while it runs, so a replay can start an app the demonstration closed) and, when UI Automation answers, `element` (`role`, `name`, `native_id`, `class_name`, `bounds`), up to six `ancestors` with a name or native id, and `match_count`: how many elements in the same top-level window share the element's control type and identity. A `match_count` above 1 means the identity alone is ambiguous on replay and the ancestors are needed.
 
 <table>
   <thead>
@@ -49,9 +49,10 @@ The first line is `recording_started` with the session parameters, then `recordi
   </thead>
   <tbody>
     <tr><td><code>click</code></td><td>A mouse button is pressed.</td><td><code>button</code>, <code>count</code> (position in a multi-click), <code>point</code>, <code>state_after</code> (<code>checked</code>, <code>selected</code>), and <code>hit</code> when the press landed on a container and was attributed to the control that took focus or changed state.</td><td><code>click</code>, or <code>check</code> and <code>uncheck</code> from <code>state_after.checked</code>.</td></tr>
+    <tr><td><code>drag</code></td><td>The left button is released farther from where it was pressed than the system drag threshold. It follows the press's <code>click</code>.</td><td><code>from</code> (where the press was), <code>point</code> (where the release was); <code>element</code> is the element under the release, read after it, so a grid that names its selection reports the range the drag selected.</td><td>A range selection or a drag and drop; replay it semantically (select the range, or the whole grid with <code>press ctrl+a</code>).</td></tr>
     <tr><td><code>type</code></td><td>Typing in one field ends: a commit key, a click elsewhere, a shortcut, or the end of the session.</td><td><code>value</code> (the field's content once typing paused), <code>typed</code> (the keystroke text while it is exact), <code>source</code> (<code>value</code> or <code>keys</code>), and <code>secure: true</code> for a password field, which carries neither <code>value</code> nor <code>typed</code>.</td><td><code>set-value</code> with <code>value</code>.</td></tr>
     <tr><td><code>select</code></td><td>A combo box's value changes after a click on it, whether the option was clicked in its popup, picked by releasing the button over it, or chosen from the keyboard.</td><td><code>value</code>, <code>previous</code>.</td><td><code>select</code> with <code>value</code>.</td></tr>
-    <tr><td><code>press</code></td><td>Return, Tab, Escape, Page Up, Page Down or a function key; a navigation key outside a text field; or any key with Ctrl, Alt or the Windows key.</td><td><code>keys</code> in <code>press</code> syntax, or <code>vk</code> for a key <code>press</code> cannot name.</td><td><code>press</code>.</td></tr>
+    <tr><td><code>press</code></td><td>Return, Tab, Escape, Page Up, Page Down or a function key; a navigation key outside a text field; or any key with Ctrl, Alt or the Windows key.</td><td><code>keys</code> in <code>press</code> syntax, or <code>vk</code> for a key <code>press</code> cannot name. A copy (<code>ctrl+c</code>, <code>ctrl+x</code>) that changed the clipboard also has <code>clipboard</code>: the <code>lines</code>, most tab-separated <code>columns</code> and <code>characters</code> of the copied text. The text itself is never recorded.</td><td><code>press</code>.</td></tr>
     <tr><td><code>scroll</code></td><td>A run of wheel notches in one direction at one place ends.</td><td><code>direction</code>, <code>amount</code> (notches), <code>point</code>.</td><td><code>scroll</code>.</td></tr>
   </tbody>
 </table>

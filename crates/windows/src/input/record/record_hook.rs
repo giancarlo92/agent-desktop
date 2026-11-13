@@ -11,6 +11,7 @@ use std::time::Instant;
 
 use agent_desktop_core::{AdapterError, ErrorCode};
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -25,6 +26,7 @@ const WM_KEYUP: u32 = 0x0101;
 const WM_SYSKEYDOWN: u32 = 0x0104;
 const WM_SYSKEYUP: u32 = 0x0105;
 const WM_LBUTTONDOWN: u32 = 0x0201;
+const WM_LBUTTONUP: u32 = 0x0202;
 const WM_RBUTTONDOWN: u32 = 0x0204;
 const WM_MBUTTONDOWN: u32 = 0x0207;
 const WM_MOUSEWHEEL: u32 = 0x020A;
@@ -43,6 +45,8 @@ pub(super) enum RawInput {
         y: i32,
         at: Instant,
     },
+    /// The left button went up: with its press, it tells a drag from a click.
+    Release { x: i32, y: i32, at: Instant },
     Wheel {
         delta: i16,
         horizontal: bool,
@@ -55,6 +59,9 @@ pub(super) enum RawInput {
         scan: u32,
         down: bool,
         at: Instant,
+        /// The clipboard's sequence number when the key was pressed, read
+        /// before the application handles the key: a copy shortcut changes it.
+        clipboard: u32,
     },
 }
 
@@ -90,6 +97,7 @@ fn mouse_input(message: u32, info: &MSLLHOOKSTRUCT) -> Option<RawInput> {
         WM_LBUTTONDOWN => "left",
         WM_RBUTTONDOWN => "right",
         WM_MBUTTONDOWN => "middle",
+        WM_LBUTTONUP => return Some(RawInput::Release { x, y, at }),
         WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
             return Some(RawInput::Wheel {
                 delta: (info.mouseData >> 16) as u16 as i16,
@@ -116,6 +124,7 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
                 scan: info.scanCode,
                 down,
                 at: Instant::now(),
+                clipboard: unsafe { GetClipboardSequenceNumber() },
             });
         }
     }

@@ -305,12 +305,17 @@ impl Observer {
 }
 
 fn window_json(window: &WindowInfo) -> Value {
-    json!({
+    let mut fields = json!({
         "id": window.id,
         "title": window.title,
         "app_name": window.app,
         "pid": window.pid.get(),
-    })
+    });
+    // Read now, while the app runs: the demonstration may close it before the end.
+    if let Some(path) = super::record_process::image_path(window.pid.get()) {
+        fields["path"] = json!(path);
+    }
+    fields
 }
 
 fn element_json(properties: &ElementProperties) -> Value {

@@ -1,5 +1,6 @@
 //! Folds raw pointer transitions into the gestures a recording reports:
-//! the position of a click inside a multi-click, and runs of wheel notches.
+//! the position of a click inside a multi-click, drags, and runs of wheel
+//! notches.
 
 use std::time::{Duration, Instant};
 
@@ -157,6 +158,43 @@ impl<T> ScrollAccumulator<T> {
             .as_ref()
             .is_some_and(|run| now.saturating_duration_since(run.last) > self.gap);
         if idle { self.run.take() } else { None }
+    }
+}
+
+/// The system's drag rule: the pointer has to move farther than this many
+/// pixels away from where it was pressed before the press becomes a drag.
+#[cfg(target_os = "windows")]
+pub(super) fn system_drag_slop() -> (i32, i32) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXDRAG, SM_CYDRAG};
+    let (x, y) = unsafe { (GetSystemMetrics(SM_CXDRAG), GetSystemMetrics(SM_CYDRAG)) };
+    (x.max(1), y.max(1))
+}
+
+/// Pairs a left press with its release. A release far enough from the press
+/// is a drag: selecting a range of cells or text, or moving something.
+#[derive(Debug)]
+pub(super) struct DragTracker {
+    slop: (i32, i32),
+    pressed: Option<(i32, i32)>,
+}
+
+impl DragTracker {
+    pub(super) fn new(slop: (i32, i32)) -> Self {
+        Self {
+            slop,
+            pressed: None,
+        }
+    }
+
+    pub(super) fn press(&mut self, x: i32, y: i32) {
+        self.pressed = Some((x, y));
+    }
+
+    /// The point the drag started at, when this release ends one.
+    pub(super) fn release(&mut self, x: i32, y: i32) -> Option<(i32, i32)> {
+        let (from_x, from_y) = self.pressed.take()?;
+        let moved = (x - from_x).abs() > self.slop.0 || (y - from_y).abs() > self.slop.1;
+        moved.then_some((from_x, from_y))
     }
 }
 

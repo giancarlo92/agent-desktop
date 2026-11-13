@@ -10,6 +10,8 @@
 use agent_desktop_core::{AdapterError, RecordRequest, RecordSink, RecordSummary};
 
 #[cfg(target_os = "windows")]
+mod record_copy;
+#[cfg(target_os = "windows")]
 mod record_element;
 #[cfg(target_os = "windows")]
 mod record_followup;
@@ -19,6 +21,8 @@ mod record_gesture;
 mod record_hook;
 #[cfg(target_os = "windows")]
 mod record_keys;
+#[cfg(target_os = "windows")]
+mod record_process;
 #[cfg(target_os = "windows")]
 mod record_session;
 #[cfg(target_os = "windows")]

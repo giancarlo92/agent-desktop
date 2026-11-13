@@ -98,3 +98,17 @@ fn wheel_deltas_map_to_directions_and_notches() {
     assert_eq!(wheel_step(30, false), Some(step("up", 1)));
     assert_eq!(wheel_step(0, false), None);
 }
+
+#[test]
+fn a_release_away_from_the_press_is_a_drag() {
+    let mut drag = DragTracker::new((4, 4));
+    drag.press(100, 100);
+    assert_eq!(drag.release(103, 98), None, "a click wobble is not a drag");
+    drag.press(100, 100);
+    assert_eq!(drag.release(400, 260), Some((100, 100)));
+    assert_eq!(
+        drag.release(500, 500),
+        None,
+        "a release without its press is ignored"
+    );
+}

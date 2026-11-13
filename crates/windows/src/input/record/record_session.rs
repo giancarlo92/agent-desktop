@@ -1,5 +1,5 @@
-//! The `record` loop: turns raw transitions into `click`, `type`, `press`
-//! and `scroll` events.
+//! The `record` loop: turns raw transitions into `click`, `drag`, `type`,
+//! `press` and `scroll` events.
 //!
 //! Typing is folded into one `type` event per field. Its `value` is the
 //! field's content read once typing pauses, which is what a replay sets; the
@@ -13,10 +13,12 @@ use agent_desktop_core::commands::record::RECORDING_READY_KIND;
 use agent_desktop_core::{AdapterError, RecordRequest, RecordSink, RecordSummary, RecordedEvent};
 use serde_json::{Map, Value, json};
 
+use super::record_copy::{copied, is_copy};
 use super::record_element::{FieldValue, Observer, Target};
 use super::record_followup::{CLICK_SETTLE, ChoiceWatch, PendingClick, is_container};
 use super::record_gesture::{
-    ClickCounter, ScrollAccumulator, ScrollRun, system_click_rule, wheel_step,
+    ClickCounter, DragTracker, ScrollAccumulator, ScrollRun, system_click_rule, system_drag_slop,
+    wheel_step,
 };
 use super::record_hook::{self, RawInput};
 use super::record_keys::{KeyClass, ModifierState, classify, key_name};
@@ -76,6 +78,7 @@ struct Recorder<'s, 'a> {
     started: Instant,
     sink: &'s mut RecordSink<'a>,
     clicks: ClickCounter,
+    drags: DragTracker,
     scroll: ScrollAccumulator<Map<String, Value>>,
     modifiers: ModifierState,
     pending: Option<PendingText>,
@@ -90,6 +93,7 @@ impl<'s, 'a> Recorder<'s, 'a> {
             started,
             sink,
             clicks: ClickCounter::new(system_click_rule()),
+            drags: DragTracker::new(system_drag_slop()),
             scroll: ScrollAccumulator::new(SCROLL_GAP, SCROLL_SLOP),
             modifiers: ModifierState::default(),
             pending: None,
@@ -106,6 +110,7 @@ impl<'s, 'a> Recorder<'s, 'a> {
                 tracing::debug!(button, x, y, "record: pointer press");
                 self.on_button(button, x, y, at)
             }
+            RawInput::Release { x, y, at } => self.on_release(x, y, at),
             RawInput::Wheel {
                 delta,
                 horizontal,
@@ -113,7 +118,13 @@ impl<'s, 'a> Recorder<'s, 'a> {
                 y,
                 at,
             } => self.on_wheel(delta, horizontal, (x, y), at),
-            RawInput::Key { vk, scan, down, at } => self.on_key(vk, scan, down, at),
+            RawInput::Key {
+                vk,
+                scan,
+                down,
+                at,
+                clipboard,
+            } => self.on_key(vk, scan, down, at, clipboard),
         }
     }
 
@@ -193,6 +204,9 @@ impl<'s, 'a> Recorder<'s, 'a> {
         if let Some(run) = self.scroll.take() {
             self.emit_scroll(run)?;
         }
+        if button == "left" {
+            self.drags.press(x, y);
+        }
         let target = self.observer.at_point(x, y);
         let count = self.clicks.register(button, x, y, at);
         if self.typing_elsewhere(&target) {
@@ -213,6 +227,26 @@ impl<'s, 'a> Recorder<'s, 'a> {
         fields.insert("point".into(), json!({"x": x, "y": y}));
         self.click = Some(PendingClick::new(&mut self.observer, target, fields, at));
         Ok(())
+    }
+
+    /// A left release far from its press ends a drag, recorded after the
+    /// press's `click` with the element under the release point: the cell a
+    /// range selection ended on, or where something was dropped. That
+    /// element is read now, so its name and state show what the drag left
+    /// (a grid names the range it selected).
+    fn on_release(&mut self, x: i32, y: i32, at: Instant) -> Result<(), AdapterError> {
+        let Some((from_x, from_y)) = self.drags.release(x, y) else {
+            return Ok(());
+        };
+        self.settle_click()?;
+        let target = self.observer.at_point(x, y);
+        if !self.observer.keeps(&target) {
+            return Ok(());
+        }
+        let mut fields = self.observer.describe(&target);
+        fields.insert("from".into(), json!({"x": from_x, "y": from_y}));
+        fields.insert("point".into(), json!({"x": x, "y": y}));
+        self.emit("drag", at, fields)
     }
 
     fn on_wheel(
@@ -240,7 +274,14 @@ impl<'s, 'a> Recorder<'s, 'a> {
         Ok(())
     }
 
-    fn on_key(&mut self, vk: u32, scan: u32, down: bool, at: Instant) -> Result<(), AdapterError> {
+    fn on_key(
+        &mut self,
+        vk: u32,
+        scan: u32,
+        down: bool,
+        at: Instant,
+        clipboard: u32,
+    ) -> Result<(), AdapterError> {
         let class = classify(vk);
         if let KeyClass::Modifier(key) = class {
             self.modifiers.apply(key, down);
@@ -251,14 +292,14 @@ impl<'s, 'a> Recorder<'s, 'a> {
         }
         if self.modifiers.is_shortcut() {
             self.flush_text()?;
-            return self.emit_press(vk, at);
+            return self.emit_press(vk, at, clipboard);
         }
         match class {
             KeyClass::Commit => {
                 self.flush_text()?;
-                self.emit_press(vk, at)
+                self.emit_press(vk, at, clipboard)
             }
-            KeyClass::Navigation if self.pending.is_none() => self.emit_press(vk, at),
+            KeyClass::Navigation if self.pending.is_none() => self.emit_press(vk, at, clipboard),
             _ => self.on_typing(vk, scan, class, at),
         }
     }
@@ -345,14 +386,24 @@ impl<'s, 'a> Recorder<'s, 'a> {
         self.emit("type", pending.started, fields)
     }
 
-    fn emit_press(&mut self, vk: u32, at: Instant) -> Result<(), AdapterError> {
+    /// A key press. A copy (ctrl+c, ctrl+x) also records the shape of what it
+    /// put on the clipboard, `clipboard` being the sequence number before it.
+    fn emit_press(&mut self, vk: u32, at: Instant, clipboard: u32) -> Result<(), AdapterError> {
         let target = self.observer.focused();
         if !self.observer.keeps(&target) {
             return Ok(());
         }
         let mut fields = self.observer.describe(&target);
         match key_name(vk) {
-            Some(name) => fields.insert("keys".into(), json!(self.modifiers.combo(&name))),
+            Some(name) => {
+                let keys = self.modifiers.combo(&name);
+                if is_copy(&keys) {
+                    if let Some(shape) = copied(clipboard) {
+                        fields.insert("clipboard".into(), shape);
+                    }
+                }
+                fields.insert("keys".into(), json!(keys))
+            }
             None => fields.insert("vk".into(), json!(vk)),
         };
         self.emit("press", at, fields)

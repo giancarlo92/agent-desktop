@@ -180,8 +180,53 @@ fn key(recorder: &mut Recorder<'_, '_>, vk: u32) {
                 scan: 0,
                 down,
                 at,
+                clipboard: 0,
             })
             .unwrap();
+    }
+}
+
+fn release(recorder: &mut Recorder<'_, '_>, (x, y): (i32, i32)) {
+    let at = Instant::now();
+    recorder.handle(RawInput::Release { x, y, at }).unwrap();
+}
+
+/// Selects across the comment box by dragging, then copies a small table: the
+/// test puts the table on the clipboard itself, the way the page would answer
+/// ctrl+c, and restores what the clipboard held before.
+fn drag_and_copy(page: &Page, recorder: &mut Recorder<'_, '_>) {
+    let rect = page.id("comentario").get_bounding_rectangle().unwrap();
+    let y = (rect.get_top() + rect.get_bottom()) / 2;
+    press(recorder, (rect.get_left() + 4, y));
+    release(recorder, (rect.get_right() - 4, y));
+    settle(recorder);
+    let deadline = || Deadline::after(2_000).unwrap();
+    let saved = crate::input::clipboard::get_clipboard_content(
+        agent_desktop_core::ClipboardFormat::Text,
+        deadline(),
+    )
+    .ok()
+    .flatten();
+    let table = agent_desktop_core::ClipboardContent::Text(
+        "1	Ana
+2	Luis
+"
+        .into(),
+    );
+    crate::input::clipboard::set_content(&table, deadline()).unwrap();
+    for (vk, down) in [(0xA2, true), (0x43, true), (0x43, false), (0xA2, false)] {
+        recorder
+            .handle(RawInput::Key {
+                vk,
+                scan: 0,
+                down,
+                at: Instant::now(),
+                clipboard: 0,
+            })
+            .unwrap();
+    }
+    if let Some(saved) = saved {
+        let _ = crate::input::clipboard::set_content(&saved, deadline());
     }
 }
 
@@ -255,6 +300,7 @@ fn demonstrate(page: &Page, recorder: &mut Recorder<'_, '_>) {
     }
     press(recorder, center(&page.id("comentario")));
     type_into(page, recorder, "comentario", "Hola");
+    drag_and_copy(page, recorder);
     let enviar = page.id("enviar");
     press(recorder, center(&enviar));
     enviar
@@ -331,6 +377,13 @@ fn a_browser_form_demonstration_records_every_step() {
     );
     assert_eq!(of(&events, "type", "comentario")[0]["value"], "Hola");
     assert_eq!(of(&events, "click", "enviar").len(), 1);
+    let drags = of(&events, "drag", "comentario");
+    assert_eq!(drags.len(), 1, "{events:#?}");
+    assert!(drags[0]["from"]["x"].as_i64() < drags[0]["point"]["x"].as_i64());
+    let copy: Vec<&Value> = events.iter().filter(|e| e["keys"] == "ctrl+c").collect();
+    assert_eq!(copy.len(), 1, "{events:#?}");
+    assert_eq!(copy[0]["clipboard"]["lines"], 2, "{events:#?}");
+    assert_eq!(copy[0]["clipboard"]["columns"], 2);
     let stray: Vec<&Value> = events
         .iter()
         .filter(|e| {
