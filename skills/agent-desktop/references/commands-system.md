@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # System Commands
 
 App lifecycle, windows, notifications, clipboard, wait, batch, sessions, health. Run `agent-desktop <command> --help` for flags.

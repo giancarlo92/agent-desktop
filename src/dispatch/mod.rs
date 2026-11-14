@@ -1,4 +1,5 @@
-﻿mod app_window;
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
+mod app_window;
 mod clipboard;
 mod cursor_overlay;
 mod disposition;

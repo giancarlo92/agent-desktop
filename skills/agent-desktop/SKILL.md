@@ -14,6 +14,7 @@ description: >
   "toggle checkbox", "take screenshot", "desktop automation", "agent-desktop",
   or any desktop GUI task on macOS, Windows or Linux.
 ---
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 
 # agent-desktop
 

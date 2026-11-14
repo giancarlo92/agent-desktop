@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use agent_desktop_core::{
     AccessibilityNode, ActionOps, AdapterError, AppInfo, ClipboardContent, ClipboardFormat,
     Deadline, DragParams, ElementState, InputOps, InteractionLease, KeyCombo, LiveElement,

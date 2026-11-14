@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # Observation Commands
 
 Commands that read UI state and never change it. Run `agent-desktop <command> --help` for flags.

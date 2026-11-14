@@ -29,7 +29,7 @@ agent-desktop record status
     <tr><td><code>--include-injected</code></td><td>off</td><td>Also record input Windows marks as injected. Off by default so the recorder ignores agent-desktop's own actions.</td></tr>
     <tr><td><code>--video</code></td><td>off</td><td>Also write an H.264 MP4 video of the recorded window, of the display (<code>--display</code>), of the display the app's first window is on (<code>--app</code>), or of the primary display. It goes beside <code>--out</code> with the <code>.mp4</code> extension.</td></tr>
     <tr><td><code>--video-out FILE.mp4</code></td><td>none</td><td>Write the video to this file instead. Implies <code>--video</code>.</td></tr>
-    <tr><td><code>--indicator</code></td><td>off (on for <code>record start</code>)</td><td>Show a small always-on-top indicator at the bottom of the recorded display: a red dot, the elapsed time and a Stop button that ends the session with <code>stop_reason: "indicator"</code>. It never takes the focus, is left out of the video, and its clicks are not recorded. <code>record start --no-indicator</code> hides it.</td></tr>
+    <tr><td><code>--no-indicator</code></td><td>off</td><td>Every session shows a small always-on-top indicator at the bottom of the recorded display: a red dot, the elapsed time and a Stop button that ends the session with <code>stop_reason: "indicator"</code>. It never takes the focus, is left out of the video, and its clicks are not recorded. Hide it only in an app that shows its own recording indicator, or in an automated test.</td></tr>
   </tbody>
 </table>
 
@@ -54,7 +54,7 @@ agent-desktop record start --window-id w-123 --video     # returns at once, afte
 agent-desktop record stop                                 # stops it and returns the summary
 ```
 
-`record status` lists the background sessions (`id`, `state` (`recording` or `ended`), `scope`, `elapsed_ms`, `out`, `video`) and the displays with their numbers, so a person or an agent can see what is recording and choose a display. `start` shows the indicator unless `--no-indicator`. `start` takes the same scope and video flags as `record` and returns `{ "id", "state": "recording", "pid", "out", "video" }` once the session is observing input. Without `--out`, the events go to `recordings/<id>.jsonl` under the agent-desktop state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`). `stop` stops the only running session, or the one `--id` names, waits up to `--timeout-ms` (default 60000) for it to finish its video, and returns `{ "id", "state": "stopped", "out", "events", "duration_ms", "stop_reason", "video" }`. Through `agent-desktop mcp` they are the tools `desktop_record_start` and `desktop_record_stop`; the foreground `record` is not a tool, because it holds the call until the session ends. The session runs as its own process, detached from the caller (and from the caller's job when the job allows it), so it outlives the call that started it. A client that kills every process it started when a turn ends (`codex exec`, one process per turn) ends the session with it; `record stop` then reports that it ended early, and the video, a fragmented MP4, plays up to that moment. Interactive clients keep their MCP server between messages, so the session lasts until `record stop`.
+`record status` lists the background sessions (`id`, `state` (`recording` or `ended`), `scope`, `elapsed_ms`, `out`, `video`) and the displays with their numbers, so a person or an agent can see what is recording and choose a display. `start` takes the same scope and video flags as `record` and returns `{ "id", "state": "recording", "pid", "out", "video" }` once the session is observing input. Without `--out`, the events go to `recordings/<id>.jsonl` under the agent-desktop state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`). `stop` stops the only running session, or the one `--id` names, waits up to `--timeout-ms` (default 60000) for it to finish its video, and returns `{ "id", "state": "stopped", "out", "events", "duration_ms", "stop_reason", "video" }`. Through `agent-desktop mcp` they are the tools `desktop_record_start` and `desktop_record_stop`; the foreground `record` is not a tool, because it holds the call until the session ends. The session runs as its own process, detached from the caller (and from the caller's job when the job allows it), so it outlives the call that started it. A client that kills every process it started when a turn ends (`codex exec`, one process per turn) ends the session with it; `record stop` then reports that it ended early, and the video, a fragmented MP4, plays up to that moment. Interactive clients keep their MCP server between messages, so the session lasts until `record stop`.
 
 ## The recording file
 
@@ -98,3 +98,14 @@ agent-desktop --headed stroke --path-file stroke.json --offset=-12,30
 ```
 
 `--path` takes `x,y` pairs separated by `;`, or a JSON array of `[x, y]` or `[x, y, ms]` points, which is the shape of a recorded drag's `path`. `--path-file` reads the same formats from a file. Points without a time are `--step-ms` apart (16 by default). `--offset` adds to every point, for a window that moved since the recording. A stroke has 2 to 4096 points and lasts at most 60 seconds.
+
+## Responsible use
+
+`record` observes a person's mouse and keyboard and can film their screen, so it is built to be seen and to stay on the computer:
+
+- A session records only after it is started (by the person, or by an agent they asked), and shows the indicator with its Stop button the whole time.
+- A session ends by itself after `--max-duration-ms` (at most one hour); nothing starts recording when Windows starts, and nothing runs in the background without `record start`.
+- Password fields are recorded without their text. A video shows whatever was on the recorded area: record one window rather than a whole display.
+- Recordings stay on the computer, in the files the caller chose. Nothing is uploaded.
+
+Record only your own work, or with the consent of the people whose screen, data or calls appear in it, and follow the privacy rules that apply to the data you record.

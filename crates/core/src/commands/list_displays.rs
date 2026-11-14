@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use crate::{AppError, adapter::PlatformAdapter};
 use serde_json::Value;
 

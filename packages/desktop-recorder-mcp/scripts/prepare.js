@@ -33,4 +33,5 @@ for (const skill of ['agent-desktop', 'agent-desktop-windows']) {
   copyDir(path.join(repo, 'skills', skill), path.join(pkg, 'skills', skill));
 }
 fs.copyFileSync(path.join(repo, 'LICENSE'), path.join(pkg, 'LICENSE'));
+fs.copyFileSync(path.join(repo, 'THIRD-PARTY-LICENSES.txt'), path.join(pkg, 'THIRD-PARTY-LICENSES.txt'));
 console.log(`vendor/agent-desktop.exe and skills/ ready (from ${exe})`);

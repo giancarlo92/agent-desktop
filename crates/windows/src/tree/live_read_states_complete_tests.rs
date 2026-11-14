@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! The states-completeness predicate's truth table, driven through
 //! `live_element` rather than the predicate directly so that a hardcoded
 //! `states_complete` cannot keep these cases green.

@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BACKUP_SUFFIX = '.bak-agent-desktop-record';
+const BACKUP_SUFFIX = '.bak-desktop-recorder-mcp';
 
 function backup(file) {
   if (fs.existsSync(file) && !fs.existsSync(file + BACKUP_SUFFIX)) {
@@ -17,7 +17,7 @@ function backup(file) {
 
 function readJson(file) {
   if (!fs.existsSync(file)) return {};
-  const text = fs.readFileSync(file, 'utf8').replace(/^﻿/, '');
+  const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
   if (!text.trim()) return {};
   try {
     return JSON.parse(text);

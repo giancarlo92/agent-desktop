@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! SelectionItemPattern select with bounded descendant search (A19-7).
 //!
 //! Self-match uses SelectionItem on the target; otherwise a walker DFS

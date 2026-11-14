@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # Interaction Commands
 
 Commands that change UI state. Run `agent-desktop <command> --help` for flags.

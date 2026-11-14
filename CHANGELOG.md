@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # Changelog
 
 ## Unreleased
@@ -5,7 +6,7 @@
 ### Features
 
 * Add `record status`: the background recordings and the displays there are to record. `record --display` takes `primary` or a display's `number`, which `list-displays` now reports, as well as its id.
-* Add the recording indicator: a small always-on-top window with a red dot, the elapsed time and a Stop button (`stop_reason: "indicator"`), shown by `record start` (unless `--no-indicator`) and by `record --indicator`. It never takes the focus and is left out of the video.
+* Add the recording indicator: a small always-on-top window with a red dot, the elapsed time and a Stop button (`stop_reason: "indicator"`), shown by every session unless `--no-indicator` (for an app that shows its own indicator, or a test). It never takes the focus and is left out of the video.
 * Add `record start` and `record stop`: a recording that runs in the background between two calls, for agents (MCP tools `desktop_record_start` and `desktop_record_stop`). `start` returns once the session is ready, with its id and paths; `stop` returns the summary.
 * Add `--video` and `--video-out` to `record` and `record start` on Windows: an H.264 MP4 of the recorded window or display, with the pointer, whose `offset_ms` maps each action's `t_ms` to the video.
 * Add `agent-desktop stroke` on Windows: a left-button drag along a path of points at their times, such as a line drawn on a canvas. It takes `x,y` pairs or the JSON `path` of a recorded drag, and `--offset` for a window that moved. A recorded `drag` now carries that `path`.

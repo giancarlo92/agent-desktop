@@ -1,0 +1,55 @@
+desktop-recorder-mcp
+
+This repository is a fork of agent-desktop by Vercel Labs
+(https://github.com/vercel-labs/agent-desktop), licensed under the Apache License,
+Version 2.0 (see LICENSE). It is not the official agent-desktop and is not endorsed by
+Vercel. "agent-desktop" and "Vercel" are names of their owners.
+
+What this fork adds or changes:
+- record: a person's own actions to JSON Lines (with drag paths, page addresses, field
+  labels, window places), an MP4 video, record start/stop/status in the background, and an
+  on-screen indicator with a Stop button, shown by default;
+- stroke: replaying a drawn path;
+- recorder fixes, display numbers in list-displays, a radio button's checked state;
+- the recording-to-script and script-repair guides;
+- packages/desktop-recorder-mcp: an installer for AI agents.
+
+Upstream files modified in this fork (each carries a notice; JSON cannot):
+- AGENTS.md
+- CHANGELOG.md
+- README.md
+- apps/docs/content/docs/commands/index.mdx
+- apps/docs/content/docs/commands/meta.json
+- apps/docs/content/docs/commands/observation.mdx
+- apps/docs/content/docs/index.mdx
+- apps/docs/content/docs/skills.mdx
+- crates/core/src/adapter/input.rs
+- crates/core/src/commands/list_displays.rs
+- crates/core/src/commands/mod.rs
+- crates/core/src/commands/skills.rs
+- crates/core/src/input/mod.rs
+- crates/core/src/lib.rs
+- crates/core/src/system/operation_report_build.rs
+- crates/windows/Cargo.toml
+- crates/windows/src/actions/select.rs
+- crates/windows/src/actions/select_tests.rs
+- crates/windows/src/adapter.rs
+- crates/windows/src/input/mod.rs
+- crates/windows/src/tree/live_read.rs
+- crates/windows/src/tree/live_read_states_complete_tests.rs
+- crates/windows/src/tree/states.rs
+- crates/windows/src/tree/states_tests.rs
+- skills/agent-desktop-windows/SKILL.md
+- skills/agent-desktop-windows/references/troubleshooting.md
+- skills/agent-desktop/SKILL.md
+- skills/agent-desktop/references/commands-interaction.md
+- skills/agent-desktop/references/commands-observation.md
+- skills/agent-desktop/references/commands-system.md
+- src/batch/mod.rs
+- src/cli/contract_command_surface_tests.rs
+- src/cli/mod.rs
+- src/cli_args/mod.rs
+- src/command_policy/mod.rs
+- src/dispatch/keyboard_mouse.rs
+- src/dispatch/mod.rs
+- src/dispatch/system.rs

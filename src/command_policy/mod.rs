@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use agent_desktop_core::{
     AdapterError, AppError, DeliverySemantics, ErrorCode, PermissionReport, refs::validate_ref_id,
 };

@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use agent_desktop_core::{
     AppError, PermissionReport, PlatformAdapter,
     commands::{
@@ -107,7 +108,7 @@ pub(super) fn record(args: RecordArgs, adapter: &dyn PlatformAdapter) -> Result<
                     stop_file: args.stop_file,
                     include_injected: args.scope.include_injected,
                     video,
-                    indicator: args.indicator,
+                    indicator: !args.no_indicator,
                 },
                 adapter,
             )

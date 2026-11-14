@@ -13,6 +13,7 @@ description: >
   "agent-desktop on Windows", "elevated window input blocked", "E_ACCESSDENIED",
   or any Windows GUI interaction task.
 ---
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 
 # agent-desktop-windows
 

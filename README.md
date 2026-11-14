@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # agent-desktop
 
 Computer use for AI agents: see and operate desktop apps on macOS, Windows, and Linux through the OS accessibility tree.

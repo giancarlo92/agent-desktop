@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! The shared single-element live read and its five projections.
 //!
 //! Mirrors macOS `post_state.rs`'s single shared read: one function takes a

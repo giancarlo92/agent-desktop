@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 /// Defines a thread-local recording sink for a physical input event type —
 /// `reset`/`recorded`/`record` over a `RefCell<Vec<$event>>` — so
 /// `keyboard_send.rs` and `mouse_send.rs` do not each hand-write the same

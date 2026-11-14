@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 pub mod batch;
 pub mod check;
 pub mod clear;

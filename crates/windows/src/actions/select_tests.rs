@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use super::{
     SELECT_LABEL, SelectOps, SelectPlan, find_after_expand, push_order,
     resolve_select_verification, select_judged_for,

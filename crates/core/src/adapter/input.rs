@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use crate::{
     AdapterError, ClipboardContent, ClipboardFormat, Deadline, DragParams, InteractionLease,
     KeyCombo, MouseEvent, OperationReport, RecordRequest, RecordSummary, RecordedEvent,

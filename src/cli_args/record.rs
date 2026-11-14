@@ -21,9 +21,9 @@ pub(crate) struct RecordArgs {
     pub video: RecordVideo,
     #[arg(
         long,
-        help = "Show an on-screen indicator while recording, with a Stop button (Windows)"
+        help = "Do not show the on-screen recording indicator (for an app that shows its own, or a test)"
     )]
-    pub indicator: bool,
+    pub no_indicator: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -53,7 +53,7 @@ pub(crate) struct RecordStartArgs {
     pub video: RecordVideo,
     #[arg(
         long,
-        help = "Do not show the on-screen recording indicator and its Stop button"
+        help = "Do not show the on-screen recording indicator (for an app that shows its own, or a test)"
     )]
     pub no_indicator: bool,
 }

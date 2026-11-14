@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # Troubleshooting
 
 Symptom-to-cause map for the Windows adapter. Each entry names the observable

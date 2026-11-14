@@ -1,3 +1,4 @@
+# Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 [package]
 name    = "agent-desktop-windows"
 version.workspace = true

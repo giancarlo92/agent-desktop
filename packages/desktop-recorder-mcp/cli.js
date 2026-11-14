@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 'use strict';
 
-// npx agent-desktop-record            install: pick your agents from a list
-// npx agent-desktop-record status     what is installed, and where
-// npx agent-desktop-record uninstall  remove it from your agents
+// npx desktop-recorder-mcp            install: pick your agents from a list
+// npx desktop-recorder-mcp status     what is installed, and where
+// npx desktop-recorder-mcp uninstall  remove it from your agents
 
 const os = require('os');
 const { agents } = require('./lib/agents');
 const { install, uninstall, status, layout } = require('./lib/install');
 const { multiselect, confirm } = require('./lib/prompt');
 
-const HELP = `agent-desktop-record: agent-desktop with record (events, video, an on-screen indicator) for your AI agents
+const HELP = `desktop-recorder-mcp: agent-desktop with record (events, video, an on-screen indicator) for your AI agents
 
 Usage:
-  npx agent-desktop-record [install] [options]   install and set up the agents you pick
-  npx agent-desktop-record status                 what is installed, and where
-  npx agent-desktop-record uninstall [options]   remove it from the agents you pick
+  npx desktop-recorder-mcp [install] [options]   install and set up the agents you pick
+  npx desktop-recorder-mcp status                 what is installed, and where
+  npx desktop-recorder-mcp uninstall [options]   remove it from the agents you pick
 
 Options:
   --agents a,b   the agents to set up, without asking: ${'claude-code, codex, gemini, claude-desktop, cursor, vscode, windsurf'}
@@ -45,7 +45,7 @@ async function main() {
   const options = parse(process.argv.slice(2));
   if (options.command === 'help') return console.log(HELP);
   if (process.platform !== 'win32' && !options.home) {
-    throw new Error('agent-desktop-record runs on Windows (record and its video are Windows only)');
+    throw new Error('desktop-recorder-mcp runs on Windows (record and its video are Windows only)');
   }
   const home = options.home || os.homedir();
   const run = { home, env: process.env, dryRun: options.dryRun, useCli: !options.home, removeProgram: options.removeProgram };
@@ -89,6 +89,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`agent-desktop-record: ${error.message}`);
+  console.error(`desktop-recorder-mcp: ${error.message}`);
   process.exitCode = 1;
 });

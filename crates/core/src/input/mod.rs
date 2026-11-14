@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 pub(crate) mod clipboard_content;
 pub(crate) mod clipboard_format;
 pub(crate) mod direction;

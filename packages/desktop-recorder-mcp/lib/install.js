@@ -1,6 +1,6 @@
 'use strict';
 
-// Installing agent-desktop-record: the program in one folder of its own, then for each chosen agent the
+// Installing desktop-recorder-mcp: the program in one folder of its own, then for each chosen agent the
 // MCP server and, where the agent reads skills from a folder, the skills.
 
 const fs = require('fs');
@@ -10,13 +10,13 @@ const { execFileSync } = require('child_process');
 const config = require('./config');
 const { agents, onPath } = require('./agents');
 
-const SERVER = 'agent-desktop-record';
+const SERVER = 'desktop-recorder';
 const PACKAGE = path.join(__dirname, '..');
 const SKILLS = ['agent-desktop', 'agent-desktop-windows'];
 
 /** Where everything goes for one home folder. */
 function layout(home) {
-  const root = path.join(home, '.agent-desktop-record');
+  const root = path.join(home, '.desktop-recorder-mcp');
   return {
     root,
     bin: path.join(root, 'bin'),
@@ -83,7 +83,7 @@ function removeSkills(agent) {
   if (!agent.skillsDir) return [];
   return SKILLS.filter((skill) => {
     const dir = path.join(agent.skillsDir, skill);
-    if (!fs.existsSync(path.join(dir, '.agent-desktop-record'))) return false;
+    if (!fs.existsSync(path.join(dir, '.desktop-recorder-mcp'))) return false;
     fs.rmSync(dir, { recursive: true, force: true });
     return true;
   });
@@ -136,7 +136,7 @@ function install(chosen, options) {
     try {
       addServer(agent, where, options);
       const skills = installSkills(agent);
-      for (const skill of skills) fs.writeFileSync(path.join(agent.skillsDir, skill, '.agent-desktop-record'), '');
+      for (const skill of skills) fs.writeFileSync(path.join(agent.skillsDir, skill, '.desktop-recorder-mcp'), '');
       results.push(`${agent.name}: MCP server added` + (skills.length ? `, skills in ${agent.skillsDir}` :
         ' (it reads the guides through the MCP server)'));
     } catch (error) {
@@ -171,7 +171,7 @@ function status(options) {
   for (const agent of agents(options.home, options.env)) {
     const found = agent.detect();
     const mcp = config.has(agent.mcp, SERVER);
-    const skills = agent.skillsDir && fs.existsSync(path.join(agent.skillsDir, 'agent-desktop', '.agent-desktop-record'));
+    const skills = agent.skillsDir && fs.existsSync(path.join(agent.skillsDir, 'agent-desktop', '.desktop-recorder-mcp'));
     lines.push(`${agent.name}: ${found ? 'found' : 'not found'}` +
       (found ? `, MCP ${mcp ? 'set up' : 'not set up'}` + (agent.skillsDir ? `, skills ${skills ? 'installed' : 'not installed'}` : '') : ''));
   }

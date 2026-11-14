@@ -1,3 +1,4 @@
+<!-- Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 # AGENTS.md
 
 Guidance for AI coding agents working in this repository.
