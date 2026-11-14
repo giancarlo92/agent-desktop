@@ -196,13 +196,13 @@ fn flag_shaped_values_stay_values_and_never_become_flags() {
 
     let mut arguments = Map::new();
     arguments.insert("ref_id".into(), Value::from("@s8f3k2p9:e1"));
-    arguments.insert("text".into(), Value::from(hostile));
-    let cli = parse(&tool_at(&["type"]), &arguments).expect("parses");
+    arguments.insert("value".into(), Value::from(hostile));
+    let cli = parse(&tool_at(&["set-value"]), &arguments).expect("parses");
     assert!(!cli.interaction.headed && cli.trace.is_none() && cli.identity.session.is_none());
-    let Some(crate::cli::Commands::Type(typed)) = cli.command else {
-        panic!("type");
+    let Some(crate::cli::Commands::SetValue(set)) = cli.command else {
+        panic!("set-value");
     };
-    assert_eq!(typed.text.as_deref(), Some(hostile));
+    assert_eq!(set.value.as_deref(), Some(hostile));
 }
 
 #[test]
@@ -226,7 +226,8 @@ fn global_flags_cannot_be_set_per_call() {
 
 #[test]
 fn stdin_input_is_not_exposed_to_mcp_calls() {
-    for path in [["type"], ["set-value"], ["clipboard-set"]] {
+    // `type` is no tool on Windows (it sends keystrokes; see dispatch::background_only).
+    for path in [["set-value"], ["clipboard-set"]] {
         let tool = tool_at(&path);
         assert!(
             tool.definition()["inputSchema"]["properties"]

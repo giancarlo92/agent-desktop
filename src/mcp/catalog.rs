@@ -50,13 +50,39 @@ fn commands(parent: &Command) -> impl Iterator<Item = &Command> {
 
 /// Commands that are never tools: an agent never stores or deletes a secret,
 /// a person does, at a terminal.
-const NOT_TOOLS: &[&[&str]] = &[&["secret", "set"], &["secret", "delete"]];
+/// Never tools: a person's secrets, and every command this build refuses
+/// because it needs the mouse, the keyboard or the foreground
+/// (`dispatch::background_only`).
+const NOT_TOOLS: &[&[&str]] = &[
+    &["secret", "set"],
+    &["secret", "delete"],
+    &["press"],
+    &["key-down"],
+    &["key-up"],
+    &["focus"],
+    &["focus-window"],
+    &["double-click"],
+    &["triple-click"],
+    &["right-click"],
+    &["hover"],
+    &["drag"],
+    &["stroke"],
+    &["mouse-click"],
+    &["mouse-move"],
+    &["mouse-down"],
+    &["mouse-up"],
+    &["mouse-wheel"],
+    &["maximize"],
+];
 
 fn collect(command: &Command, mut path: Vec<String>, found: &mut Vec<Tool>) {
     path.push(command.get_name().to_string());
-    if NOT_TOOLS
-        .iter()
-        .any(|blocked| blocked.iter().eq(path.iter()))
+    // On Windows `type` sends keystrokes, so it is no tool there either.
+    let windows_type = cfg!(target_os = "windows") && path.len() == 1 && path[0] == "type";
+    if windows_type
+        || NOT_TOOLS
+            .iter()
+            .any(|blocked| blocked.iter().eq(path.iter()))
     {
         return;
     }

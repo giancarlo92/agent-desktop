@@ -1,8 +1,12 @@
+#[cfg(target_os = "windows")]
+pub(crate) mod background_value;
 pub(crate) mod chain;
 pub(crate) mod disclosure;
 pub(crate) mod dispatch;
 pub(crate) mod envelope_parity;
 pub(crate) mod focus;
+#[cfg(target_os = "windows")]
+pub(crate) mod focus_guard;
 pub(crate) mod input_envelope_parity;
 pub(crate) mod mutation;
 pub(crate) mod physical_click;

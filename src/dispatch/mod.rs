@@ -1,5 +1,6 @@
 // Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 mod app_window;
+pub(crate) mod background_only;
 mod clipboard;
 mod cursor_overlay;
 mod disposition;
@@ -38,6 +39,9 @@ pub(crate) fn dispatch(
     permission_report: &PermissionReport,
     context: &CommandContext,
 ) -> Result<Value, AppError> {
+    if let Some(refused) = background_only::refusal(&cmd) {
+        return Err(refused);
+    }
     let read_only = !cmd.is_mutating();
     let stdin = crate::cli_args::stdin::input(&mut cmd).is_some();
     let result = dispatch_command(cmd, adapter, permission_report, context)

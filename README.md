@@ -68,8 +68,12 @@ Each command prints one JSON envelope. A trimmed snapshot:
   with `--window-id`.
 - **Dense apps:** map first with `snapshot --skeleton --app Slack -i --compact`, then drill into one region with
   `snapshot --root @s8f3k2p9:e3 -i --compact`.
-- **Headless by default.** Ref actions use the accessibility API without moving the pointer or taking focus. The global
-  `--headed` flag allows physical input.
+- **Background only (this fork).** Every action uses the accessibility API: it never moves the pointer, never types
+  with the keyboard and never brings a window to the front, so the person can keep working. There is no switch:
+  `--headed` and the commands that need physical input or the foreground (`press`, `key-down`, `key-up`, `focus`,
+  `focus-window`, `double-click`, `triple-click`, `right-click`, `hover`, `drag`, `stroke`, the `mouse-*` commands,
+  `maximize`, `launch --activate`, and `type` on Windows) return `POLICY_DENIED` with what to use instead. Use
+  `set-value` to write text and `click` to press buttons.
 - **Post-action waits** observe the ref's original process. Window-owned refs stay pinned to their original window,
   including refs captured from a sheet, alert, popover, focused view, or Linux menu. macOS application menus keep
   their application-owned surface and need no document window. The wait reads the whole pinned window, so overlay

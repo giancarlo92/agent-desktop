@@ -5,7 +5,7 @@ pub(crate) struct InteractionArgs {
     #[arg(
         long,
         global = true,
-        help = "Prefer physical delivery for natural input commands and permit focus/cursor side effects. Default is strict headless semantic delivery."
+        help = "Not available: this build always works in the background, without the mouse, the keyboard or taking the focus"
     )]
     pub headed: bool,
 }

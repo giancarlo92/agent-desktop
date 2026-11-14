@@ -28,7 +28,7 @@ the guest's exit status. Read \
 desktop_skills_get with name \"desktop\" first for the observe-act loop, and with name \
 \"platform\" for what differs on this OS. The skills use CLI syntax: `agent-desktop snapshot \
 --app Finder` is desktop_snapshot with {\"app\": \"Finder\"}, and the input schema replaces \
---help. Global flags (--session, --agent-id, --headed, --wait-for, --trace) are fixed \
+--help. Global flags (--session, --agent-id, --wait-for, --trace) are fixed \
 by how this server was started and cannot be passed per call; desktop_sandbox_exec gets none of \
 them, so put the guest command's flags in its args. Refs such as @s8f3k2p9:e1 come from \
 desktop_snapshot and go stale when the UI changes: on STALE_REF or AMBIGUOUS_TARGET, snapshot \

@@ -69,9 +69,9 @@ Action results carry `data.disposition` and errors carry `error.disposition`, ea
 - Branch on `error.code` and `error.disposition`. Message and suggestion text can change.
 - `details.retryable: false` means waiting cannot change the outcome. Try a different approach.
 
-## Headless and headed
+## Background only
 
-Ref actions are headless by default. They use semantic accessibility calls and do not take focus, move the cursor, synthesize keys or use the clipboard. If no semantic path exists, the action fails closed. Use the global `--headed` flag only when the user explicitly permits physical input, such as double-click, hover, drag, or focus. Never switch to headed mode to recover from a headless failure. Raw coordinates (`--xy`) never imply focus. Which actions need `--headed` differs by OS: read the platform skill.
+This build works only in the background: actions use semantic accessibility calls and never move the cursor, type with the keyboard or bring a window to the front, so the person can keep working while you act. There is no `--headed`. Write text with `set-value` (on Windows `type` is refused), press buttons with `click`, and act on a window behind others directly: never try to bring it forward. `press`, `key-down`, `key-up`, `focus`, `focus-window`, `double-click`, `triple-click`, `right-click`, `hover`, `drag`, `stroke`, the `mouse-*` commands, `maximize` and `launch --activate` return `POLICY_DENIED` with what to use instead. If an action has no semantic path, it fails: report it, do not look for a way around it. A minimized window has no readable elements: `restore` shows it without activating it. On Windows, some apps (Chrome, Edge, Electron) bring their own window forward when they receive a click or a value; the tool gives the focus back to the person's window within milliseconds.
 
 ## Sandboxes
 

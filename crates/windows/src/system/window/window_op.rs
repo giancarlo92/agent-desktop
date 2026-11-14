@@ -168,13 +168,15 @@ fn show_verb(
     deadline: Deadline,
 ) -> Result<(), AdapterError> {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, ShowWindowAsync,
+        SW_MAXIMIZE, SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE, ShowWindowAsync,
     };
 
+    // Minimize and restore never activate a window: whatever the person has in
+    // front stays there. (Maximize always activates; the CLI refuses it.)
     let command = match verb {
-        ShowVerb::Minimize => SW_MINIMIZE,
+        ShowVerb::Minimize => SW_SHOWMINNOACTIVE,
         ShowVerb::Maximize => SW_MAXIMIZE,
-        ShowVerb::Restore => SW_RESTORE,
+        ShowVerb::Restore => SW_SHOWNOACTIVATE,
     };
     ensure_owned_before(evidence)?;
     if unsafe { ShowWindowAsync(handle, command) } == 0 {

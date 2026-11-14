@@ -53,7 +53,25 @@ mod imp {
 
     const LEGACY_LABEL: &str = "LegacyIAccessible.DoDefaultAction";
 
+    /// Every action keeps the person's window in front (see `focus_guard`),
+    /// unless the request allows taking the focus.
     pub(crate) fn execute_action_impl(
+        handle: &NativeHandle,
+        request: ActionRequest,
+        lease: &InteractionLease,
+    ) -> Result<ActionResult, AdapterError> {
+        if request.policy.allow_focus_steal || handle.is_null() {
+            return execute_action_unguarded(handle, request, lease);
+        }
+        let target_pid = uia_element(handle)
+            .ok()
+            .and_then(|element| element.0.get_process_id().ok());
+        crate::actions::focus_guard::guarded(target_pid, || {
+            execute_action_unguarded(handle, request, lease)
+        })
+    }
+
+    fn execute_action_unguarded(
         handle: &NativeHandle,
         request: ActionRequest,
         lease: &InteractionLease,

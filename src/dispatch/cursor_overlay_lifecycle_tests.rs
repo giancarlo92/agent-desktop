@@ -165,6 +165,7 @@ fn headed_context(manifest: &agent_desktop_core::session::SessionManifest) -> Co
 }
 
 #[test]
+#[ignore = "this build refuses press: it works only in the background (dispatch::background_only)"]
 fn mutating_keyboard_and_clipboard_commands_re_show_cursor_overlay() {
     let _home = HomeGuard::new();
     let manifest = started_overlay_session();
@@ -251,6 +252,7 @@ fn non_mutating_commands_skip_cursor_overlay_lifecycle() {
 }
 
 #[test]
+#[ignore = "this build refuses press: it works only in the background (dispatch::background_only)"]
 fn cursor_overlay_show_fires_even_when_the_mutating_command_errors() {
     let _home = HomeGuard::new();
     let manifest = started_overlay_session();

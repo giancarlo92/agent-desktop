@@ -53,6 +53,12 @@ mod imp {
         policy: InteractionPolicy,
         deadline: Deadline,
     ) -> Result<Vec<ActionStep>, AdapterError> {
+        if !policy.allow_focus_steal
+            && let Some(steps) =
+                crate::actions::background_value::background_set_value(element, value, deadline)?
+        {
+            return Ok(steps);
+        }
         let parsed = parse_finite_f64(value);
         set_value_judged_for(
             deadline,

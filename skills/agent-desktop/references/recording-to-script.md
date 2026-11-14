@@ -43,7 +43,7 @@ If the person said something about the task (a step they forgot, a value that ch
 
 A value that will be different next time is a parameter, not a fixed value: a name, an email, an amount, a date, a file name, a search term. Ask the person when it is not clear. Give each parameter an English `snake_case` name, a short question that explains it, and the recorded value as its example.
 
-- A password (`secure: true`) is never written in the script and never invented. Use a secret by name: the script runs `secret fill <field ref> <name>` (with `--headed` on a web form), with an English name that says what it is for (`bank-login`). The first run opens a small window where the person types the password once; it is saved bound to that app and site, and every later run fills it on its own (see `commands-system`, section `secret`). A password box often has no name: find it by `native_id`. The script can be shared: whoever runs it is asked for their own password the first time.
+- A password (`secure: true`) is never written in the script and never invented. Use a secret by name: the script runs `secret fill <field ref> <name>`, with an English name that says what it is for (`bank-login`). The first run opens a small window where the person types the password once; it is saved bound to that app and site, and every later run fills it on its own (see `commands-system`, section `secret`). A password box often has no name: find it by `native_id`. The script can be shared: whoever runs it is asked for their own password the first time.
 - A choice among a fixed set (a size, a country) is a parameter whose question lists the valid options.
 
 ## 4. Start from a clean state
@@ -62,16 +62,18 @@ Find an element right before acting on it, every time: refs belong to one snapsh
 |---|---|
 | `click` on a button, link, tab, menu item | `click` the element |
 | `click` with `state_after.checked` | `check` or `uncheck` the element (it is idempotent) |
-| `type` into a field | `set-value` the element with `value` (or the parameter). If the field refuses it, `click` it, `press ctrl+a`, then `type --headed` |
+| `type` into a field | `set-value` the element with `value` (or the parameter). If the field refuses it, the step cannot run in the background: say so |
 | `type` with `secure: true` (a password) | `secret fill` the element with the secret's name |
-| `type` into a grid cell or a canvas editor ("Cell Editor") | Select the cell, `press` the first character so the editor appears, then `set-value` the editor with the whole value, then `press` the key the person pressed (`return`, `tab`) |
+| `type` into a grid cell or a canvas editor ("Cell Editor") | Select the cell (`select` or `click`), then `set-value` the cell or its editor with the whole value. A grid that only accepts typing cannot be filled in the background: say so |
 | `select` | `select` the combo box with `value` |
-| `press` (`return`, `ctrl+s`, `tab`) | `press` the same `keys`, to the app's window |
+| `press` (`return`, `ctrl+s`, `tab`) | `click` the button that does the same (Save, OK, Send, the form's submit button). A key with no button cannot run in the background: say so |
 | `scroll` | Usually nothing: find the element the next action needs; `scroll-to` it if it is not visible |
-| `drag` that selected cells or text | Select the same range semantically, or everything with `ctrl+a` when the recording shows the extent (a copy's `clipboard` lines and columns) |
-| `drag` on a canvas (no named element) | `stroke --path-file` with the recorded `path`, moved by `--offset` the difference between the window's `bounds` now and in the recording |
-| A click with no name at all (a drawn grid, a canvas) | `mouse-click --headed` at the same point relative to the window's `bounds` |
-| A copy (`ctrl+c`) with `clipboard` | Select the same extent first, then `press ctrl+c`; after pasting, check the destination has the same number of lines |
+| `drag` that selected cells or text | Select the same range semantically (`select`) |
+| `drag` on a canvas (no named element) | Not available: drawing needs the mouse. Say so |
+| A click with no name at all (a drawn grid, a canvas) | Not available: this build never uses the mouse. Look for the element's name in a fresh snapshot, or leave the step out and say why |
+| A copy (`ctrl+c`) with `clipboard` | Read the source with `get` and write it where it goes with `set-value` (or `clipboard-set`) |
+
+Scripts run in the background: the person can keep working, so never bring a window forward (no `focus-window`, `press`, `type` or mouse commands).
 
 Actions in the script happen faster than a person's. After an action that opens or changes something (a dialog, a new page, a list that loads), wait for the element the next step needs before acting: `wait --text`, `wait --window`, or a `find` retried until it answers.
 
@@ -150,7 +152,11 @@ function Step([int] $number, [string] $what, [scriptblock] $action) {
 
 # --- The task ---------------------------------------------------------------
 Step 1 'Open the form' {
-    Start-Process 'chrome.exe' 'https://demoqa.com/text-box'
+    # Started through WMI, Chrome opens behind the person's windows (Start-Process would bring it forward).
+    $chrome = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+    $behind = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]4 }
+    Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+        CommandLine = "`"$chrome`" --new-window https://demoqa.com/text-box"; ProcessStartupInformation = $behind } | Out-Null
     $script:page = Window 'chrome.exe' 'demosite'                # the recording's window.title
 }
 Step 2 'Type the full name' {

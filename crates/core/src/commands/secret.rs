@@ -19,7 +19,6 @@ use crate::context::CommandContext;
 const MAX_NAME: usize = 64;
 const MAX_SECRET: usize = 1_024;
 const ADDRESS_BAR: &str = "Address and search bar";
-const PROMPT_SETTLE_MS: u64 = 600;
 
 pub struct SetArgs {
     pub name: String,
@@ -117,48 +116,20 @@ pub fn fill(
             args.name
         )));
     }
-    // Typing it, like a person, fires the events a page listens for (a React
-    // or Vue form keeps its own copy of the value); setting it does not.
-    // The write goes through type and set-value themselves, so it keeps their
-    // input policy, verification and errors.
-    let typed = context.is_headed();
-    if asked && typed {
-        // The prompt just closed: let the window it hands the focus back to
-        // become active before keys are sent to it.
-        std::thread::sleep(std::time::Duration::from_millis(PROMPT_SETTLE_MS));
-    }
-    let outcome = if typed {
-        // Keys go to the focused element only, so the field gets the focus
-        // first (a script usually comes from another field).
-        crate::commands::focus::execute(
-            crate::commands::helpers::RefArgs {
-                ref_id: args.ref_id.clone(),
-                timeout_ms: args.timeout_ms,
-            },
-            adapter,
-            context,
-        )?;
-        crate::commands::type_text::execute(
-            crate::commands::type_text::TypeArgs {
-                ref_id: args.ref_id,
-                text: secret.secret.clone(),
-                timeout_ms: args.timeout_ms,
-                interval_ms: None,
-            },
-            adapter,
-            context,
-        )
-    } else {
-        crate::commands::set_value::execute(
-            crate::commands::set_value::SetValueArgs {
-                ref_id: args.ref_id,
-                value: secret.secret.clone(),
-                timeout_ms: args.timeout_ms,
-            },
-            adapter,
-            context,
-        )
-    };
+    // The write goes through set-value itself, so it keeps its input policy,
+    // verification and errors. On Windows it never brings the window to the
+    // front: a web field gets the text as window messages (which also fire
+    // the events a React or Vue form listens for), a classic text box as
+    // WM_SETTEXT.
+    let outcome = crate::commands::set_value::execute(
+        crate::commands::set_value::SetValueArgs {
+            ref_id: args.ref_id,
+            value: secret.secret.clone(),
+            timeout_ms: args.timeout_ms,
+        },
+        adapter,
+        context,
+    );
     match outcome {
         Ok(mut value) => {
             redact(&mut value, &secret.secret);
@@ -168,15 +139,8 @@ pub fn fill(
                 }
             }
             value["secret"] = json!(args.name);
-            value["method"] = json!(if typed { "typed" } else { "set" });
             if asked {
                 value["saved_now"] = json!(true);
-            }
-            if !typed {
-                value["note"] = json!(
-                    "The value was set directly. A page that reacts to typing (a React or Vue \
-                     form) may not notice it: run with --headed to type it like a person"
-                );
             }
             Ok(value)
         }

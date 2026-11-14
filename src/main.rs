@@ -106,6 +106,9 @@ fn run() -> ExitCode {
     };
 
     let cmd_name = cmd.name();
+    if cli.interaction.headed {
+        return finish(cmd_name, Err(dispatch::background_only::headed_refused()));
+    }
     if let Commands::Sandbox(args) = &cmd
         && let SandboxActionCli::Exec(exec) = &args.action
     {
