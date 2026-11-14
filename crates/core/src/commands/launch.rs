@@ -50,6 +50,7 @@ pub fn execute(args: LaunchArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
     .then(|| {
         let pages = crate::system::launch_options::take_pages(&mut options.args);
         options.args.push("--no-startup-window".to_owned());
+        crate::system::launch_options::keep_working_while_covered(&mut options.args);
         options.timeout_ms = 0;
         pages
     });
@@ -62,13 +63,16 @@ pub fn execute(args: LaunchArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
     if let Some(port) = options.cdp_port {
         let granted = deadline.remaining();
         let endpoint = verify_cdp_endpoint(port, deadline, granted, &launched, adapter)?;
-        if let Some(pages) = &background_pages
-            && !crate::system::cdp_page::open_in_background(
+        let opened = background_pages.as_ref().map(|pages| {
+            let opened = crate::system::cdp_page::open_in_background(
                 &endpoint.websocket_url,
                 pages,
                 deadline.remaining(),
-            )
-        {
+            );
+            adapter.keep_new_windows_behind(launched.pid, deadline);
+            opened
+        });
+        if opened == Some(false) {
             return Err(AppError::Adapter(
                 AdapterError::new(
                     ErrorCode::ActionFailed,

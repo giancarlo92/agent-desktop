@@ -60,6 +60,33 @@ pub fn take_pages(args: &mut Vec<String>) -> Vec<String> {
     pages
 }
 
+/// A Chromium window that other windows cover completely is treated as
+/// hidden: its page stops updating, and so does its accessibility tree. A
+/// browser that works behind the person's windows is always covered, so
+/// these switches turn that off.
+pub fn keep_working_while_covered(args: &mut Vec<String>) {
+    const FEATURE: &str = "CalculateNativeWinOcclusion";
+    match args
+        .iter_mut()
+        .find(|arg| arg.starts_with("--disable-features="))
+    {
+        Some(existing) if !existing.contains(FEATURE) => {
+            existing.push(',');
+            existing.push_str(FEATURE);
+        }
+        Some(_) => {}
+        None => args.push(format!("--disable-features={FEATURE}")),
+    }
+    for switch in [
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+    ] {
+        if !args.iter().any(|arg| arg == switch) {
+            args.push(switch.to_owned());
+        }
+    }
+}
+
 /// Whether the launch arguments give the program a profile directory of its
 /// own (`--user-data-dir`, as Chromium browsers take it): such an instance is
 /// separate from any other running instance of the same program.

@@ -193,6 +193,13 @@ impl SystemOps for WindowsAdapter {
         tcp_listener::owns_listener(&process, port, deadline)
     }
 
+    #[cfg(target_os = "windows")]
+    fn keep_new_windows_behind(&self, pid: agent_desktop_core::ProcessId, _deadline: Deadline) {
+        if let Some(guard) = crate::actions::focus_guard::Guard::for_new_window(u32::from(pid)) {
+            guard.finish();
+        }
+    }
+
     /// Verified termination: `Ok(())` only after the process is observed gone
     /// (A21-3). Graceful posts `WM_CLOSE`; force calls `TerminateProcess`.
     fn close_app(

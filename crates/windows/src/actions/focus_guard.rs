@@ -31,18 +31,17 @@ use std::time::{Duration, Instant};
 
 use windows_sys::Win32::Foundation::{CloseHandle, HWND, POINT};
 use windows_sys::Win32::System::Threading::{
-    AttachThreadInput, GetCurrentThreadId, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    QueryFullProcessImageNameW,
+    OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, VK_LBUTTON, VK_LWIN, VK_MBUTTON, VK_MENU, VK_RBUTTON, VK_RWIN,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, CallNextHookEx, DispatchMessageW, GA_ROOT, GUITHREADINFO, GetAncestor,
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId,
-    HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, LLKHF_UP, MSG, MsgWaitForMultipleObjects,
-    PM_REMOVE, PeekMessageW, QS_ALLINPUT, SetForegroundWindow, SetWindowsHookExW, TranslateMessage,
-    UnhookWindowsHookEx, WH_KEYBOARD_LL, WindowFromPoint,
+    CallNextHookEx, DispatchMessageW, GA_ROOT, GUITHREADINFO, GetAncestor, GetClassNameW,
+    GetCursorPos, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, HC_ACTION,
+    KBDLLHOOKSTRUCT, LLKHF_INJECTED, LLKHF_UP, MSG, MsgWaitForMultipleObjects, PM_REMOVE,
+    PeekMessageW, QS_ALLINPUT, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
+    WH_KEYBOARD_LL, WindowFromPoint,
 };
 
 /// How long after an action the target's activation is still watched for:
@@ -59,6 +58,9 @@ const PERSON_RECENT: Duration = Duration::from_millis(600);
 pub(crate) struct Target {
     pub(crate) pid: u32,
     pub(crate) image: Option<String>,
+    /// Whether its new windows also go to the bottom of the stack, and if so
+    /// whether Chromium windows do too (see `behind`).
+    pub(crate) to_back: Option<bool>,
 }
 
 struct Watch {
@@ -72,7 +74,9 @@ struct Watch {
     seen: isize,
     button_down: bool,
     person_click_on_target: Option<Instant>,
+    /// A taskbar click or Alt/Windows not yet followed by a change of window.
     person_switch_key: Option<Instant>,
+    behind: Option<crate::actions::behind::Behind>,
     debug: bool,
 }
 
@@ -158,8 +162,14 @@ impl Watch {
             let mut point = POINT { x: 0, y: 0 };
             unsafe { GetCursorPos(&mut point) };
             let root = unsafe { GetAncestor(WindowFromPoint(point), GA_ROOT) };
-            if !root.is_null() && (self.is_target(process_of(root)) || is_taskbar(root)) {
+            let in_front = front();
+            // A click on the target counts only when it brings the target forward.
+            let target_behind = in_front.is_null() || !self.is_target(process_of(in_front));
+            if !root.is_null() && target_behind && self.is_target(process_of(root)) {
                 self.person_click_on_target = Some(Instant::now());
+            }
+            if !root.is_null() && is_taskbar(root) {
+                self.person_switch_key = Some(Instant::now());
             }
         }
         self.button_down = down;
@@ -182,7 +192,9 @@ impl Watch {
             return;
         }
         if !self.is_target(process_of(now)) {
+            // The person moved to another window: their taskbar click was for it.
             self.person = now as isize;
+            self.person_switch_key = None;
             return;
         }
         if self.released || self.person == 0 {
@@ -198,7 +210,7 @@ impl Watch {
             }
             return;
         }
-        give_back(self.person as HWND, now);
+        crate::actions::behind::give_back(self.person as HWND, now);
         if self.debug {
             let back = front() as isize == self.person;
             eprintln!("guard: taken tick={}, given back: {back}", tick());
@@ -248,7 +260,26 @@ impl Guard {
     /// foreground when the person has just typed or clicked.
     pub(crate) fn for_launch(pid: u32, executable: &std::path::Path) -> Option<Self> {
         let image = Some(executable.to_string_lossy().to_lowercase());
-        Self::start(Target { pid, image }, LAUNCH_SETTLE)
+        Self::start(
+            Target {
+                pid,
+                image,
+                to_back: Some(false),
+            },
+            LAUNCH_SETTLE,
+        )
+    }
+
+    /// A guard for a running program that is about to show a new window.
+    pub(crate) fn for_new_window(pid: u32) -> Option<Self> {
+        Self::start(
+            Target {
+                pid,
+                image: None,
+                to_back: Some(true),
+            },
+            LAUNCH_SETTLE,
+        )
     }
 
     /// Stops after the settle time has passed.
@@ -272,7 +303,16 @@ impl Drop for Guard {
 /// Runs `action` and keeps the foreground where the person has it, when the
 /// action's target belongs to `target_pid` and is not the window in use.
 pub(crate) fn guarded<T>(target_pid: Option<u32>, action: impl FnOnce() -> T) -> T {
-    let guard = target_pid.and_then(|pid| Guard::start(Target { pid, image: None }, ACTION_SETTLE));
+    let guard = target_pid.and_then(|pid| {
+        Guard::start(
+            Target {
+                pid,
+                image: None,
+                to_back: None,
+            },
+            ACTION_SETTLE,
+        )
+    });
     let result = action();
     if let Some(guard) = guard {
         guard.finish();
@@ -285,6 +325,7 @@ fn watch(target: Target, person: isize, settle: Duration, done: &AtomicBool) {
     if debug {
         eprintln!("guard: start tick={} target={}", tick(), target.pid);
     }
+    let to_back = target.to_back;
     WATCH.with(|slot| {
         *slot.borrow_mut() = Some(Watch {
             target,
@@ -295,6 +336,7 @@ fn watch(target: Target, person: isize, settle: Duration, done: &AtomicBool) {
             button_down: false,
             person_click_on_target: None,
             person_switch_key: None,
+            behind: to_back.map(crate::actions::behind::Behind::new),
             debug,
         });
     });
@@ -314,6 +356,12 @@ fn watch(target: Target, person: isize, settle: Duration, done: &AtomicBool) {
             if let Some(watch) = slot.borrow_mut().as_mut() {
                 watch.observe_person();
                 watch.keep_person_in_front();
+                if !watch.released
+                    && let Some(mut behind) = watch.behind.take()
+                {
+                    behind.sweep(|pid| watch.is_target(pid));
+                    watch.behind = Some(behind);
+                }
             }
         });
         match finished {
@@ -349,21 +397,4 @@ unsafe extern "system" fn before_key(code: i32, wparam: usize, lparam: isize) ->
         }
     }
     unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
-}
-
-/// Puts `person` back in front. A process that is not in front may not do
-/// that on its own, so this thread joins the input queue of the window that
-/// took the foreground for the call.
-fn give_back(person: HWND, taken_by: HWND) {
-    let own = unsafe { GetCurrentThreadId() };
-    let theirs = unsafe { GetWindowThreadProcessId(taken_by, std::ptr::null_mut()) };
-    let attached =
-        theirs != 0 && theirs != own && unsafe { AttachThreadInput(own, theirs, 1) } != 0;
-    unsafe {
-        BringWindowToTop(person);
-        SetForegroundWindow(person);
-    }
-    if attached {
-        unsafe { AttachThreadInput(own, theirs, 0) };
-    }
 }
