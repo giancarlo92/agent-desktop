@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 #[cfg(target_os = "windows")]
 pub(crate) mod background_value;
 pub(crate) mod chain;

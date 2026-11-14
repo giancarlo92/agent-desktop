@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use super::*;
 use clap::Parser;
 use clap::error::ErrorKind;

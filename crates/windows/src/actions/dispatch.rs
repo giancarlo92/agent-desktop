@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! `execute_action` match over every `Action` variant.
 //!
 //! Click routes through the Invoke + Legacy chain. SetValue / Clear route

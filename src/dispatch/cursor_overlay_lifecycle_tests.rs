@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use super::dispatch;
 use crate::cli::Commands;
 use crate::cli_args::actions::PressArgs;

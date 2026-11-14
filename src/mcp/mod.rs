@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! Stdio MCP server. Every leaf CLI command is one tool, and every call runs that command through the CLI.
 
 mod call;

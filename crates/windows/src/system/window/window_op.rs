@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 #[cfg(target_os = "windows")]
 use crate::system::runtime::hresult::win32_last_error;
 use agent_desktop_core::{

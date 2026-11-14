@@ -11,6 +11,7 @@ What this fork adds or changes:
   on-screen indicator with a Stop button, shown by default;
 - stroke: replaying a drawn path;
 - recorder fixes, display numbers in list-displays, a radio button's checked state;
+- background only: never the mouse, the keyboard or the foreground (--headed and physical commands refused);
 - secret: passwords asked for once (or saved ahead) and kept in the system secret store, then written into fields by name;
 - the recording-to-script and script-repair guides;
 - packages/desktop-recorder-mcp: an installer for AI agents.
@@ -35,11 +36,15 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - crates/core/src/lib.rs
 - crates/core/src/system/operation_report_build.rs
 - crates/windows/Cargo.toml
+- crates/windows/src/actions/dispatch.rs
+- crates/windows/src/actions/mod.rs
 - crates/windows/src/actions/select.rs
 - crates/windows/src/actions/select_tests.rs
+- crates/windows/src/actions/value_write.rs
 - crates/windows/src/adapter.rs
 - crates/windows/src/input/mod.rs
 - crates/windows/src/system/launch.rs
+- crates/windows/src/system/window/window_op.rs
 - crates/windows/src/tree/live_read.rs
 - crates/windows/src/tree/live_read_states_complete_tests.rs
 - crates/windows/src/tree/states.rs
@@ -54,9 +59,14 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - src/batch/mod.rs
 - src/cli/contract_command_surface_tests.rs
 - src/cli/mod.rs
+- src/cli_args/interaction.rs
 - src/cli_args/mod.rs
 - src/command_policy/mod.rs
+- src/dispatch/cursor_overlay_lifecycle_tests.rs
 - src/dispatch/keyboard_mouse.rs
 - src/dispatch/mod.rs
 - src/dispatch/system.rs
+- src/main.rs
 - src/mcp/catalog.rs
+- src/mcp/catalog_tests.rs
+- src/mcp/mod.rs

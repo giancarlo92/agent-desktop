@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! ValuePattern / RangeValuePattern writes for `SetValue` and `Clear`.
 //!
 //! Verification re-reads route through [`gated_pattern_value_equals`] /
