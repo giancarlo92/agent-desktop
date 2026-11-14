@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use super::{ClickAvailability, click_chain_judged_for, execute_action_impl};
 use crate::actions::chain::DeliveryOutcome;
 use crate::system::fixture::test_time::deadline;

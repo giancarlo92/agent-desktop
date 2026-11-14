@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 pub(crate) mod adapter;
 pub(crate) mod app_ops;
 pub(crate) mod capture;
