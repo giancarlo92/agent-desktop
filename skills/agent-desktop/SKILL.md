@@ -118,3 +118,5 @@ Load one only when you need it: `agent-desktop skills get desktop <reference>`.
 | `commands-interaction` | You choose between click, type, set-value, select, toggle, scroll, press and mouse commands, or you debug an action error |
 | `commands-system` | You launch or close apps, manage windows, use the clipboard, `wait`, `record`, `batch`, sessions, multi-agent cursors, tracing, or load skills |
 | `workflows` | You want worked patterns (forms, menus, dialogs, waiting for a new window, scroll-find, drag) and the anti-patterns list |
+| `recording-to-script` | A person recorded a task (`record`) and wants a script that replays it without AI: reading the recording, parameters, checks, a PowerShell skeleton |
+| `script-repair` | A script made from a recording fails or leaves the task incomplete: finding the first wrong step, fixing only it, running it all again |

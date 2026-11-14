@@ -10,6 +10,10 @@ const SKILL_DESKTOP_REF_SYSTEM: &str =
     include_str!("../../../../skills/agent-desktop/references/commands-system.md");
 const SKILL_DESKTOP_REF_WORKFLOWS: &str =
     include_str!("../../../../skills/agent-desktop/references/workflows.md");
+const SKILL_DESKTOP_REF_RECORDING_TO_SCRIPT: &str =
+    include_str!("../../../../skills/agent-desktop/references/recording-to-script.md");
+const SKILL_DESKTOP_REF_SCRIPT_REPAIR: &str =
+    include_str!("../../../../skills/agent-desktop/references/script-repair.md");
 
 const SKILL_MACOS_MAIN: &str = include_str!("../../../../skills/agent-desktop-macos/SKILL.md");
 const SKILL_MACOS_REF_TROUBLESHOOTING: &str =
@@ -95,6 +99,14 @@ const SKILL_DESKTOP_REFS: &[SkillRef] = &[
     SkillRef {
         rel_path: "references/workflows.md",
         body: SKILL_DESKTOP_REF_WORKFLOWS,
+    },
+    SkillRef {
+        rel_path: "references/recording-to-script.md",
+        body: SKILL_DESKTOP_REF_RECORDING_TO_SCRIPT,
+    },
+    SkillRef {
+        rel_path: "references/script-repair.md",
+        body: SKILL_DESKTOP_REF_SCRIPT_REPAIR,
     },
 ];
 

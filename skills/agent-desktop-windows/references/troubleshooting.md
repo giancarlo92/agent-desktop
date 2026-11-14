@@ -26,6 +26,16 @@ that boundary, while reads still succeed.
 Fix: run your terminal elevated to the target's level. See
 `permissions-and-elevation.md`.
 
+## "private file DACL grants an untrusted principal"
+
+agent-desktop keeps its refs, snapshots and recordings in a private state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`) and refuses any file there that another account can read. Codex CLI's Windows sandbox grants its group (`<computer>\CodexSandboxUsers`) read access to folders its sessions touch, including that one, so every later command fails with this error, from Codex or not. Remove the grant, then run the command again:
+
+```powershell
+icacls "$env:USERPROFILE\.agent-desktop" /remove:g "$env:COMPUTERNAME\CodexSandboxUsers" /T /C /Q
+```
+
+To avoid it, point `AGENT_DESKTOP_HOME` at a folder the sandbox does not touch.
+
 ## COM Apartment Error
 
 ```json
