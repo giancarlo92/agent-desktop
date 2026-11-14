@@ -2,6 +2,8 @@
 #[cfg(target_os = "windows")]
 pub(crate) mod background_value;
 pub(crate) mod chain;
+#[cfg(target_os = "windows")]
+pub(crate) mod devtools;
 pub(crate) mod disclosure;
 pub(crate) mod dispatch;
 pub(crate) mod envelope_parity;

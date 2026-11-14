@@ -32,9 +32,16 @@ fn open_backup_semantics(path: &Path) -> std::fs::File {
 }
 
 fn set_owner(path: &Path, owner: &SidBuffer) {
+    let status = try_set_owner(path, owner);
+    assert_eq!(status, 0, "SetSecurityInfo(owner) failed: {status}");
+}
+
+/// The Win32 status of setting `owner`: 0, or the error (1307 when the SID
+/// may not be assigned by this token).
+fn try_set_owner(path: &Path, owner: &SidBuffer) -> u32 {
     let handle = open_backup_semantics(path);
     let raw: HANDLE = handle.as_raw_handle();
-    let status = unsafe {
+    unsafe {
         SetSecurityInfo(
             raw,
             SE_FILE_OBJECT,
@@ -44,8 +51,7 @@ fn set_owner(path: &Path, owner: &SidBuffer) {
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         )
-    };
-    assert_eq!(status, 0, "SetSecurityInfo(owner) failed: {status}");
+    }
 }
 
 fn read_owner(path: &Path) -> SidBuffer {
@@ -147,7 +153,17 @@ fn a_directory_owned_by_an_unrelated_sid_is_refused() {
     std::fs::create_dir(&target).unwrap();
     enable_privilege(SE_RESTORE_NAME);
     let guests = SidBuffer::well_known(WinBuiltinGuestsSid).unwrap();
-    set_owner(&target, &guests);
+    // Giving a directory to a SID outside this token needs SeRestorePrivilege,
+    // which only an elevated process holds: without it the system answers
+    // ERROR_INVALID_OWNER and there is nothing to test.
+    const ERROR_INVALID_OWNER: u32 = 1307;
+    let status = try_set_owner(&target, &guests);
+    if status == ERROR_INVALID_OWNER {
+        eprintln!("skipped: this process may not assign an unrelated owner (not elevated)");
+        std::fs::remove_dir_all(&root).unwrap();
+        return;
+    }
+    assert_eq!(status, 0, "SetSecurityInfo(owner) failed: {status}");
 
     let error = directory::ensure_private(&target).expect_err("an unrelated owner must be refused");
     assert_eq!(error.code, agent_desktop_core::ErrorCode::Internal);

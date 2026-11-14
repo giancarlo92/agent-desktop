@@ -42,7 +42,7 @@ pub(crate) struct LaunchArgs {
     pub cwd: Option<std::path::PathBuf>,
     #[arg(
         long = "no-attach",
-        help = "Start a fresh instance instead of attaching to a running one (Windows fails if the app is already running)"
+        help = "Start a fresh instance instead of attaching to a running one (Windows fails if the app is already running, unless --arg=--user-data-dir=... gives it a profile of its own)"
     )]
     #[serde(default)]
     pub no_attach: bool,

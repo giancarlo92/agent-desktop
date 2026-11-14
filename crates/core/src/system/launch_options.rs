@@ -38,6 +38,34 @@ impl Default for LaunchOptions {
     }
 }
 
+/// Takes the pages to open out of a browser's arguments: every argument that
+/// is not a switch, and the `--new-window` that would go with them. With
+/// none, the browser opens a blank page.
+pub fn take_pages(args: &mut Vec<String>) -> Vec<String> {
+    let mut pages = Vec::new();
+    args.retain(|arg| {
+        if arg == "--new-window" {
+            return false;
+        }
+        if arg.starts_with('-') {
+            return true;
+        }
+        pages.push(arg.clone());
+        false
+    });
+    if pages.is_empty() {
+        pages.push("about:blank".to_owned());
+    }
+    pages
+}
+
+/// Whether the launch arguments give the program a profile directory of its
+/// own (`--user-data-dir`, as Chromium browsers take it): such an instance is
+/// separate from any other running instance of the same program.
+pub fn has_own_profile(args: &[String]) -> bool {
+    args.iter().any(|arg| arg.starts_with("--user-data-dir"))
+}
+
 #[cfg(test)]
 #[path = "launch_options_tests.rs"]
 mod tests;

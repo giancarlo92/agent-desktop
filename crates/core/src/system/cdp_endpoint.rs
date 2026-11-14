@@ -9,6 +9,7 @@ use crate::{AdapterError, AppError, Deadline, ErrorCode};
 const MAX_ATTEMPT_TIMEOUT: Duration = Duration::from_millis(500);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_RESPONSE_BYTES: usize = 64 * 1024;
+const MAX_LIST_BYTES: usize = 2 * 1024 * 1024;
 
 /// A DevTools endpoint returned only after the caller verifies listener
 /// ownership. `port` comes from launch setup; the remaining fields come from
@@ -64,6 +65,32 @@ pub(crate) fn probe(port: u16, deadline: Deadline) -> Result<CdpEndpoint, AppErr
     }
 }
 
+/// The DevTools endpoint on `port`, if one answers there right now.
+pub fn endpoint_now(port: u16, timeout: Duration) -> Option<CdpEndpoint> {
+    match attempt(port, timeout) {
+        Attempt::Verified(endpoint) => Some(endpoint),
+        Attempt::RespondedWithoutDevtoolsBody | Attempt::NotYetListening => None,
+    }
+}
+
+/// The JSON a DevTools HTTP path answers with (`/json/list`), or `None`.
+pub fn get_json(port: u16, path: &str, timeout: Duration) -> Option<serde_json::Value> {
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = TcpStream::connect_timeout(&address, timeout).ok()?;
+    stream.set_read_timeout(Some(timeout)).ok()?;
+    stream.set_write_timeout(Some(timeout)).ok()?;
+    let request =
+        format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    stream.write_all(request.as_bytes()).ok()?;
+    let raw = read_http_response_up_to(&mut stream, timeout, MAX_LIST_BYTES)?;
+    let text = String::from_utf8_lossy(&raw);
+    let (head, body) = text.split_once("\r\n\r\n")?;
+    if !head.starts_with("HTTP/1.1 200") {
+        return None;
+    }
+    serde_json::from_str(body.trim()).ok()
+}
+
 fn attempt(port: u16, timeout: Duration) -> Attempt {
     let address = SocketAddr::from(([127, 0, 0, 1], port));
     let Ok(mut stream) = TcpStream::connect_timeout(&address, timeout) else {
@@ -98,6 +125,14 @@ fn attempt(port: u16, timeout: Duration) -> Attempt {
 /// iteration, so a server that trickles a byte at a time can only ever cost
 /// this attempt its allotted `timeout`, not one full read-timeout per byte.
 fn read_http_response(stream: &mut TcpStream, timeout: Duration) -> Option<Vec<u8>> {
+    read_http_response_up_to(stream, timeout, MAX_RESPONSE_BYTES)
+}
+
+fn read_http_response_up_to(
+    stream: &mut TcpStream,
+    timeout: Duration,
+    max_bytes: usize,
+) -> Option<Vec<u8>> {
     let started = Instant::now();
     let mut raw = Vec::new();
     let mut chunk = [0_u8; 4096];
@@ -110,7 +145,7 @@ fn read_http_response(stream: &mut TcpStream, timeout: Duration) -> Option<Vec<u
             Ok(0) => break,
             Ok(received) => {
                 raw.extend_from_slice(&chunk[..received]);
-                if response_complete(&raw) || raw.len() > MAX_RESPONSE_BYTES {
+                if response_complete(&raw) || raw.len() > max_bytes {
                     break;
                 }
             }

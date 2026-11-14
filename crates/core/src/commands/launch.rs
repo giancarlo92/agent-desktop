@@ -27,7 +27,9 @@ pub fn execute(args: LaunchArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
     let requested_cdp_port = options.cdp_port;
     if let Some(requested_port) = requested_cdp_port {
         reject_conflicting_cdp_switch(&options)?;
-        reject_if_already_running(&app, adapter, deadline)?;
+        if !crate::system::launch_options::has_own_profile(&options.args) {
+            reject_if_already_running(&app, adapter, deadline)?;
+        }
         let resolved_port = resolve_cdp_port(requested_port)?;
         options
             .args
@@ -37,6 +39,19 @@ pub fn execute(args: LaunchArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
             .push("--remote-debugging-address=127.0.0.1".to_owned());
         options.cdp_port = Some(resolved_port);
     }
+    // A Chromium browser activates its first window as soon as it shows it.
+    // Started without one, it opens its pages in a background window through
+    // DevTools instead, which never takes the foreground.
+    let background_pages = (requested_cdp_port.is_some()
+        && !options.activate
+        && cfg!(target_os = "windows")
+        && is_chromium_browser(&app))
+    .then(|| {
+        let pages = crate::system::launch_options::take_pages(&mut options.args);
+        options.args.push("--no-startup-window".to_owned());
+        options.timeout_ms = 0;
+        pages
+    });
     let probe_budget = requested_cdp_port.map(|_| probe_reserve(deadline.remaining()));
     let launch_deadline = probe_budget.map_or(deadline, |reserve| {
         deadline.capped(deadline.remaining().saturating_sub(reserve))
@@ -45,9 +60,23 @@ pub fn execute(args: LaunchArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
     let mut launched = adapter.launch_app(&app, &options, &lease)?;
     if let Some(port) = options.cdp_port {
         let granted = deadline.remaining();
-        launched.cdp = Some(verify_cdp_endpoint(
-            port, deadline, granted, &launched, adapter,
-        )?);
+        let endpoint = verify_cdp_endpoint(port, deadline, granted, &launched, adapter)?;
+        if let Some(pages) = &background_pages
+            && !crate::system::cdp_page::open_in_background(
+                &endpoint.websocket_url,
+                pages,
+                deadline.remaining(),
+            )
+        {
+            return Err(AppError::Adapter(
+                AdapterError::new(
+                    ErrorCode::ActionFailed,
+                    "The browser started, but its window could not be opened through DevTools",
+                )
+                .with_disposition(DeliverySemantics::delivered_unverified()),
+            ));
+        }
+        launched.cdp = Some(endpoint);
     }
     if launched.suggestion.is_none() {
         launched.suggestion = launch_suggestion(requested_cdp_port.is_some(), &launched);
@@ -156,6 +185,14 @@ fn reject_if_already_running(
         )
         .with_disposition(DeliverySemantics::not_delivered()),
     ))
+}
+
+/// Whether the launch target is a Chromium browser (not an Electron app,
+/// which makes its own windows and ignores `--no-startup-window`).
+fn is_chromium_browser(id: &str) -> bool {
+    let stem = launch_path_stem(id).unwrap_or(id).to_ascii_lowercase();
+    let stem = stem.strip_suffix(".exe").unwrap_or(&stem);
+    matches!(stem, "chrome" | "msedge" | "brave" | "chromium" | "vivaldi")
 }
 
 fn launch_path_stem(id: &str) -> Option<&str> {

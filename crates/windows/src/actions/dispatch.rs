@@ -64,6 +64,18 @@ mod imp {
         if request.policy.allow_focus_steal || handle.is_null() {
             return execute_action_unguarded(handle, request, lease);
         }
+        // A web page of a browser started with a DevTools endpoint is acted on
+        // through it: that never brings the browser's window forward.
+        if let Ok(element) = uia_element(handle) {
+            corroborate_verified_process(element)?;
+            if let Some(steps) = crate::actions::devtools::devtools_steps(
+                element,
+                &request.action,
+                lease.deadline(),
+            )? {
+                return Ok(ActionResult::from_execution(&request.action, steps));
+            }
+        }
         let target_pid = uia_element(handle)
             .ok()
             .and_then(|element| element.0.get_process_id().ok());
@@ -213,6 +225,11 @@ mod imp {
         policy: InteractionPolicy,
         deadline: Deadline,
     ) -> Result<ActionResult, AdapterError> {
+        if !policy.allow_focus_steal
+            && let Some(step) = crate::actions::background_value::background_click(element)?
+        {
+            return Ok(ActionResult::from_execution(&Action::Click, vec![step]));
+        }
         let steps = click_chain_judged_for(
             deadline,
             policy,

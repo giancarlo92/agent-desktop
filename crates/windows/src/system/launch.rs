@@ -38,8 +38,16 @@ pub(crate) fn launch_app_impl(
         return Ok(attached);
     }
     let (pid, token) = create_process(&executable, options, deadline)?;
-    let window = observe_window(pid, &token, options, deadline)?;
-    Ok(launch_result(id, pid, token, window))
+    #[cfg(target_os = "windows")]
+    let guard = (!options.activate)
+        .then(|| crate::actions::focus_guard::Guard::for_launch(u32::from(pid), &executable))
+        .flatten();
+    let window = observe_window(pid, &token, options, deadline);
+    #[cfg(target_os = "windows")]
+    if let Some(guard) = guard {
+        guard.finish();
+    }
+    Ok(launch_result(id, pid, token, window?))
 }
 
 /// The window a launch actually caused, or `None`. A process that presents no

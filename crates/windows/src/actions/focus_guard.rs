@@ -1,32 +1,108 @@
-//! Keeps the person's window in front while a headless action runs.
+//! Keeps the person's window in front while a headless action or a launch runs.
 //!
-//! A semantic UI Automation call never sends input, but some providers
-//! activate their own window when they receive one: Chromium (Chrome, Edge,
-//! Electron) does it about 30 ms after a click or a value arrives, and keys the
-//! person types at that moment would land in it. A thread of its own watches
-//! the foreground from the start of every headless action until `WATCH` after
-//! it, and when the target's process has taken it, gives it back to the window
-//! the person had in front, within milliseconds.
+//! A semantic UI Automation call never sends input, but a target can still
+//! bring its own window to the front: Chromium (Chrome, Edge, Electron) does
+//! it about 30 ms after a click or a value arrives, and Windows lets a newly
+//! started program take the foreground when the person has just typed or
+//! clicked. Keys the person presses at that moment would land in the target.
+//!
+//! While a guard runs, a thread of its own:
+//!
+//! - looks at the foreground every millisecond and, when a window of the
+//!   target has taken it, gives it back to the window the person had in front
+//!   (the latest one: the person can move between their own windows freely);
+//! - observes key presses with a low-level keyboard hook, only to run that
+//!   same check *before* each key is delivered: Windows decides where a key
+//!   goes after its hooks return, so a key pressed while the target is in
+//!   front still reaches the person's window. No key is read, kept or changed.
+//!
+//! The person stays in charge: a click on the target's window or on the
+//! taskbar, or Alt/Windows held, means they brought it forward themselves, and
+//! the guard lets go.
 //!
 //! Two other ways were measured and left out: dropping Chromium's injected
 //! "foreground" key (it then waits 2 s and comes forward anyway), and
 //! `LockSetForegroundWindow` (Chromium still came forward).
 
+use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use windows_sys::Win32::Foundation::HWND;
-use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows_sys::Win32::Foundation::{CloseHandle, HWND, POINT};
+use windows_sys::Win32::System::Threading::{
+    AttachThreadInput, GetCurrentThreadId, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    QueryFullProcessImageNameW,
+};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, VK_LBUTTON, VK_LWIN, VK_MBUTTON, VK_MENU, VK_RBUTTON, VK_RWIN,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, MSG, PM_NOREMOVE,
-    PeekMessageW, SetForegroundWindow,
+    BringWindowToTop, CallNextHookEx, DispatchMessageW, GA_ROOT, GUITHREADINFO, GetAncestor,
+    GetClassNameW, GetCursorPos, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId,
+    HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, LLKHF_UP, MSG, MsgWaitForMultipleObjects,
+    PM_REMOVE, PeekMessageW, QS_ALLINPUT, SetForegroundWindow, SetWindowsHookExW, TranslateMessage,
+    UnhookWindowsHookEx, WH_KEYBOARD_LL, WindowFromPoint,
 };
 
-/// How long after the action the target's activation is still watched for:
+/// How long after an action the target's activation is still watched for:
 /// Chromium can activate its window a while after the call returns.
-const WATCH: Duration = Duration::from_millis(1_500);
-const POLL: Duration = Duration::from_millis(1);
+const ACTION_SETTLE: Duration = Duration::from_millis(1_500);
+/// How long after a launched program shows its window: it activates the
+/// window right after showing it.
+const LAUNCH_SETTLE: Duration = Duration::from_millis(1_500);
+/// A click or Alt/Windows this recent means the person moved the focus.
+const PERSON_RECENT: Duration = Duration::from_millis(600);
+
+/// The windows a guard keeps behind: those of one process, and of any process
+/// running the same executable (a program that restarts itself).
+pub(crate) struct Target {
+    pub(crate) pid: u32,
+    pub(crate) image: Option<String>,
+}
+
+struct Watch {
+    target: Target,
+    /// The window the person has in front (0 when none is known).
+    person: isize,
+    /// Whether each process seen in front belongs to the target.
+    known: Vec<(u32, bool)>,
+    released: bool,
+    /// What `front` last returned, for the debug trace.
+    seen: isize,
+    button_down: bool,
+    person_click_on_target: Option<Instant>,
+    person_switch_key: Option<Instant>,
+    debug: bool,
+}
+
+thread_local! {
+    static WATCH: RefCell<Option<Watch>> = const { RefCell::new(None) };
+}
+
+fn tick() -> u32 {
+    unsafe { windows_sys::Win32::System::SystemInformation::GetTickCount() }
+}
+
+/// The window keys would go to now. While a window is being activated the
+/// system reports no foreground window, although the keys already go to the
+/// thread that is taking over: then it is that thread's active window.
+fn front() -> HWND {
+    let window = unsafe { GetForegroundWindow() };
+    if !window.is_null() {
+        return window;
+    }
+    let mut info: GUITHREADINFO = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+    if unsafe { GetGUIThreadInfo(0, &mut info) } == 0 {
+        return std::ptr::null_mut();
+    }
+    if !info.hwndActive.is_null() {
+        info.hwndActive
+    } else {
+        info.hwndFocus
+    }
+}
 
 fn process_of(window: HWND) -> u32 {
     let mut pid = 0u32;
@@ -34,72 +110,258 @@ fn process_of(window: HWND) -> u32 {
     pid
 }
 
-/// Runs `action` and keeps the foreground where the person had it, when the
-/// action's target belongs to `target_pid` and was not already in front.
+fn image_of(pid: u32) -> Option<String> {
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return None;
+    }
+    let mut buffer = vec![0_u16; 1_024];
+    let mut size = buffer.len() as u32;
+    let ok = unsafe { QueryFullProcessImageNameW(handle, 0, buffer.as_mut_ptr(), &mut size) };
+    unsafe { CloseHandle(handle) };
+    (ok != 0 && size != 0)
+        .then(|| String::from_utf16_lossy(&buffer[..size as usize]).to_lowercase())
+}
+
+fn key_down(key: u16) -> bool {
+    (unsafe { GetAsyncKeyState(i32::from(key)) } as u16 & 0x8000) != 0
+}
+
+fn recent(at: Option<Instant>) -> bool {
+    at.is_some_and(|at| at.elapsed() <= PERSON_RECENT)
+}
+
+impl Watch {
+    fn is_target(&mut self, pid: u32) -> bool {
+        if pid == 0 {
+            return false;
+        }
+        if pid == self.target.pid {
+            return true;
+        }
+        if let Some((_, known)) = self.known.iter().find(|(seen, _)| *seen == pid) {
+            return *known;
+        }
+        let same_image = self
+            .target
+            .image
+            .as_ref()
+            .is_some_and(|image| image_of(pid).as_ref() == Some(image));
+        self.known.push((pid, same_image));
+        same_image
+    }
+
+    /// Notes what the person is doing with the mouse and the switching keys.
+    fn observe_person(&mut self) {
+        let down = key_down(VK_LBUTTON) || key_down(VK_RBUTTON) || key_down(VK_MBUTTON);
+        if down && !self.button_down {
+            let mut point = POINT { x: 0, y: 0 };
+            unsafe { GetCursorPos(&mut point) };
+            let root = unsafe { GetAncestor(WindowFromPoint(point), GA_ROOT) };
+            if !root.is_null() && (self.is_target(process_of(root)) || is_taskbar(root)) {
+                self.person_click_on_target = Some(Instant::now());
+            }
+        }
+        self.button_down = down;
+        if key_down(VK_MENU) || key_down(VK_LWIN) || key_down(VK_RWIN) {
+            self.person_switch_key = Some(Instant::now());
+        }
+    }
+
+    /// Gives the foreground back when a window of the target holds it and the
+    /// person did not bring it there.
+    fn keep_person_in_front(&mut self) {
+        let now = front();
+        if self.debug && now as isize != self.seen {
+            self.seen = now as isize;
+            let pid = process_of(now);
+            let target = self.is_target(pid);
+            eprintln!("guard: front pid={pid} target={target} tick={}", tick());
+        }
+        if now.is_null() || now as isize == self.person {
+            return;
+        }
+        if !self.is_target(process_of(now)) {
+            self.person = now as isize;
+            return;
+        }
+        if self.released || self.person == 0 {
+            return;
+        }
+        if recent(self.person_click_on_target) || recent(self.person_switch_key) {
+            self.released = true;
+            if self.debug {
+                eprintln!(
+                    "guard: the person brought the target forward tick={}",
+                    tick()
+                );
+            }
+            return;
+        }
+        give_back(self.person as HWND, now);
+        if self.debug {
+            let back = front() as isize == self.person;
+            eprintln!("guard: taken tick={}, given back: {back}", tick());
+        }
+    }
+}
+
+fn is_taskbar(window: HWND) -> bool {
+    let mut class = [0u16; 64];
+    let length = unsafe { GetClassNameW(window, class.as_mut_ptr(), class.len() as i32) };
+    if length <= 0 {
+        return false;
+    }
+    let class = String::from_utf16_lossy(&class[..length as usize]);
+    matches!(
+        class.as_str(),
+        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "XamlExplorerHostIslandWindow"
+    )
+}
+
+/// A guard that runs until `finish`, then for its settle time.
+pub(crate) struct Guard {
+    done: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Guard {
+    /// Starts guarding, unless the target is the window the person is using.
+    pub(crate) fn start(target: Target, settle: Duration) -> Option<Self> {
+        let person = front();
+        if target.pid == 0 || (!person.is_null() && process_of(person) == target.pid) {
+            return None;
+        }
+        let done = Arc::new(AtomicBool::new(false));
+        let thread = {
+            let done = done.clone();
+            let person = person as isize;
+            std::thread::spawn(move || watch(target, person, settle, &done))
+        };
+        Some(Self {
+            done,
+            thread: Some(thread),
+        })
+    }
+
+    /// A guard for a program that was just started: Windows lets it take the
+    /// foreground when the person has just typed or clicked.
+    pub(crate) fn for_launch(pid: u32, executable: &std::path::Path) -> Option<Self> {
+        let image = Some(executable.to_string_lossy().to_lowercase());
+        Self::start(Target { pid, image }, LAUNCH_SETTLE)
+    }
+
+    /// Stops after the settle time has passed.
+    pub(crate) fn finish(mut self) {
+        self.done.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        self.done.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+/// Runs `action` and keeps the foreground where the person has it, when the
+/// action's target belongs to `target_pid` and is not the window in use.
 pub(crate) fn guarded<T>(target_pid: Option<u32>, action: impl FnOnce() -> T) -> T {
-    let before = unsafe { GetForegroundWindow() };
-    let Some(target_pid) = target_pid.filter(|&pid| pid != 0) else {
-        return action();
-    };
-    if before.is_null() || process_of(before) == target_pid {
-        return action();
-    }
-    let debug = std::env::var_os("AGENT_DESKTOP_GUARD_DEBUG").is_some();
-    let done = Arc::new(AtomicBool::new(false));
-    let watcher = {
-        let done = done.clone();
-        let before = before as isize;
-        std::thread::spawn(move || watch(before as HWND, target_pid, &done, debug))
-    };
-    let acting = Instant::now();
+    let guard = target_pid.and_then(|pid| Guard::start(Target { pid, image: None }, ACTION_SETTLE));
     let result = action();
-    if debug {
-        eprintln!("guard: action took {:?}", acting.elapsed());
+    if let Some(guard) = guard {
+        guard.finish();
     }
-    done.store(true, Ordering::SeqCst);
-    let _ = watcher.join();
     result
 }
 
-/// Gives the foreground back to `before` whenever the target's process takes
-/// it, until `WATCH` after the action is done.
-fn watch(before: HWND, target_pid: u32, done: &AtomicBool, debug: bool) {
-    let started = Instant::now();
+fn watch(target: Target, person: isize, settle: Duration, done: &AtomicBool) {
+    let debug = std::env::var_os("AGENT_DESKTOP_GUARD_DEBUG").is_some();
+    if debug {
+        eprintln!("guard: start tick={} target={}", tick(), target.pid);
+    }
+    WATCH.with(|slot| {
+        *slot.borrow_mut() = Some(Watch {
+            target,
+            person,
+            known: Vec::new(),
+            released: false,
+            seen: 0,
+            button_down: false,
+            person_click_on_target: None,
+            person_switch_key: None,
+            debug,
+        });
+    });
+    let mut message: MSG = unsafe { std::mem::zeroed() };
+    let hook =
+        unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(before_key), std::ptr::null_mut(), 0) };
     let mut finished: Option<Instant> = None;
     loop {
-        let now = unsafe { GetForegroundWindow() };
-        if !now.is_null() && now != before && process_of(now) == target_pid {
-            give_back(before, now);
-            if debug {
-                let back = unsafe { GetForegroundWindow() } == before;
-                eprintln!(
-                    "guard: taken at {:?}, given back: {back}",
-                    started.elapsed()
-                );
+        unsafe { MsgWaitForMultipleObjects(0, std::ptr::null(), 0, 1, QS_ALLINPUT) };
+        while unsafe { PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
+            unsafe {
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
             }
         }
+        WATCH.with(|slot| {
+            if let Some(watch) = slot.borrow_mut().as_mut() {
+                watch.observe_person();
+                watch.keep_person_in_front();
+            }
+        });
         match finished {
-            Some(at) if at.elapsed() >= WATCH => return,
+            Some(at) if at.elapsed() >= settle => break,
             None if done.load(Ordering::SeqCst) => finished = Some(Instant::now()),
             _ => {}
         }
-        std::thread::sleep(POLL);
+    }
+    if !hook.is_null() {
+        unsafe { UnhookWindowsHookEx(hook) };
+    }
+    WATCH.with(|slot| *slot.borrow_mut() = None);
+    if debug {
+        eprintln!("guard: end tick={}", tick());
     }
 }
 
-/// Puts `before` back in front. A process that is not in front may not do
+/// Runs before a key the person pressed is delivered: if the target took the
+/// foreground a moment ago, the person's window gets it back first, so the
+/// key goes there. The key itself is not looked at.
+unsafe extern "system" fn before_key(code: i32, wparam: usize, lparam: isize) -> isize {
+    if code == HC_ACTION as i32 && lparam != 0 {
+        let event = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
+        if event.flags & (LLKHF_INJECTED | LLKHF_UP) == 0 {
+            WATCH.with(|slot| {
+                if let Ok(mut slot) = slot.try_borrow_mut() {
+                    if let Some(watch) = slot.as_mut() {
+                        watch.observe_person();
+                        watch.keep_person_in_front();
+                    }
+                }
+            });
+        }
+    }
+    unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+}
+
+/// Puts `person` back in front. A process that is not in front may not do
 /// that on its own, so this thread joins the input queue of the window that
-/// took the foreground for the call (which needs a queue of its own first).
-fn give_back(before: HWND, taken_by: HWND) {
+/// took the foreground for the call.
+fn give_back(person: HWND, taken_by: HWND) {
     let own = unsafe { GetCurrentThreadId() };
     let theirs = unsafe { GetWindowThreadProcessId(taken_by, std::ptr::null_mut()) };
-    let mut message: MSG = unsafe { std::mem::zeroed() };
-    unsafe { PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_NOREMOVE) };
     let attached =
         theirs != 0 && theirs != own && unsafe { AttachThreadInput(own, theirs, 1) } != 0;
     unsafe {
-        BringWindowToTop(before);
-        SetForegroundWindow(before);
+        BringWindowToTop(person);
+        SetForegroundWindow(person);
     }
     if attached {
         unsafe { AttachThreadInput(own, theirs, 0) };

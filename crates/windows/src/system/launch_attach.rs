@@ -16,7 +16,11 @@ pub(super) fn prepare(
 ) -> Result<(PathBuf, Option<LaunchResult>), AdapterError> {
     let matches = matching_processes(image_file_name(id))?;
     if !options.attach_if_running {
-        if let Some(row) = matches.first() {
+        // A browser started with a profile directory of its own is a separate
+        // instance, whatever else of that browser is running.
+        if let Some(row) = matches.first()
+            && !agent_desktop_core::system::launch_options::has_own_profile(&options.args)
+        {
             return Err(super::already_running_error(row.pid, &matches));
         }
         return Ok((resolve_executable(id)?, None));

@@ -1,4 +1,4 @@
-mod adapter;
+pub(crate) mod adapter;
 pub(crate) mod app_ops;
 pub(crate) mod capture;
 pub(crate) mod close;

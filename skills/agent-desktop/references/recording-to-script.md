@@ -73,7 +73,7 @@ Find an element right before acting on it, every time: refs belong to one snapsh
 | A click with no name at all (a drawn grid, a canvas) | Not available: this build never uses the mouse. Look for the element's name in a fresh snapshot, or leave the step out and say why |
 | A copy (`ctrl+c`) with `clipboard` | Read the source with `get` and write it where it goes with `set-value` (or `clipboard-set`) |
 
-Scripts run in the background: the person can keep working, so never bring a window forward (no `focus-window`, `press`, `type` or mouse commands).
+Scripts run in the background: the person can keep working, so never bring a window forward (no `focus-window`, `press`, `type` or mouse commands), and open every app with `launch`, a browser with `launch --no-attach --cdp` and a profile folder of the script's own.
 
 Actions in the script happen faster than a person's. After an action that opens or changes something (a dialog, a new page, a list that loads), wait for the element the next step needs before acting: `wait --text`, `wait --window`, or a `find` retried until it answers.
 
@@ -152,11 +152,11 @@ function Step([int] $number, [string] $what, [scriptblock] $action) {
 
 # --- The task ---------------------------------------------------------------
 Step 1 'Open the form' {
-    # Started through WMI, Chrome opens behind the person's windows (Start-Process would bring it forward).
-    $chrome = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-    $behind = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]4 }
-    Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-        CommandLine = "`"$chrome`" --new-window https://demoqa.com/text-box"; ProcessStartupInformation = $behind } | Out-Null
+    # launch keeps the person's window in front; --cdp lets the page be clicked and written
+    # without the browser ever coming forward. The profile folder belongs to this script.
+    $profile = "$env:LOCALAPPDATA\my-script\chrome-profile"
+    Run @('launch', 'C:\Program Files\Google\Chrome\Application\chrome.exe', '--no-attach', '--cdp',
+        "--arg=--user-data-dir=$profile", '--arg=--no-first-run', '--arg=https://demoqa.com/text-box') | Out-Null
     $script:page = Window 'chrome.exe' 'demosite'                # the recording's window.title
 }
 Step 2 'Type the full name' {

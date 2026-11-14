@@ -260,7 +260,8 @@ fn live_fixture_click_delivers_invoke_or_legacy_unverified() {
         .find(|step| matches!(step.outcome, ActionStepOutcome::Succeeded))
         .expect("a delivered step");
     assert!(
-        succeeded.label() == "InvokePattern.Invoke"
+        succeeded.label() == "WindowMessage.BN_CLICKED"
+            || succeeded.label() == "InvokePattern.Invoke"
             || succeeded.label() == "LegacyIAccessible.DoDefaultAction",
         "unexpected label {}",
         succeeded.label()
