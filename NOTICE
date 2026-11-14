@@ -29,6 +29,7 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - crates/core/Cargo.toml
 - crates/core/src/adapter/input.rs
 - crates/core/src/adapter/input_tests.rs
+- crates/core/src/adapter/system.rs
 - crates/core/src/commands/launch.rs
 - crates/core/src/commands/list_displays.rs
 - crates/core/src/commands/mod.rs
@@ -37,6 +38,7 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - crates/core/src/lib.rs
 - crates/core/src/system/cdp_endpoint.rs
 - crates/core/src/system/launch_options.rs
+- crates/core/src/system/launch_options_tests.rs
 - crates/core/src/system/mod.rs
 - crates/core/src/system/operation_report_build.rs
 - crates/windows/Cargo.toml
@@ -48,6 +50,7 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - crates/windows/src/actions/value_write.rs
 - crates/windows/src/adapter.rs
 - crates/windows/src/input/mod.rs
+- crates/windows/src/system/adapter.rs
 - crates/windows/src/system/interaction_lease/directory_tests.rs
 - crates/windows/src/system/launch.rs
 - crates/windows/src/system/launch_attach.rs

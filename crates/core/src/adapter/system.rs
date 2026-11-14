@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 use crate::{
     AdapterError, AdapterSession, AppInfo, CursorOverlayControl, Deadline, DeliverySemantics,
     DismissAllNotificationsRequest, DismissNotificationRequest, ErrorCode, ImageBuffer,
