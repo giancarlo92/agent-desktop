@@ -27,6 +27,7 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - apps/docs/content/docs/skills.mdx
 - crates/core/Cargo.toml
 - crates/core/src/adapter/input.rs
+- crates/core/src/adapter/input_tests.rs
 - crates/core/src/commands/list_displays.rs
 - crates/core/src/commands/mod.rs
 - crates/core/src/commands/skills.rs
