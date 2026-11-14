@@ -1,0 +1,5 @@
+vendor/
+skills/
+LICENSE
+node_modules/
+*.tgz

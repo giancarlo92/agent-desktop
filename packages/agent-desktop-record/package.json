@@ -1,0 +1,40 @@
+﻿{
+  "name": "agent-desktop-record",
+  "version": "0.1.0",
+  "description": "Install agent-desktop with record (events, video, background start/stop, an on-screen indicator) into your AI agents: Claude Code, Codex, Gemini CLI, Cursor, VS Code, Windsurf and Claude Desktop. A fork of vercel-labs/agent-desktop.",
+  "license": "Apache-2.0",
+  "bin": {
+    "agent-desktop-record": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "lib",
+    "vendor",
+    "skills",
+    "README.md",
+    "NOTICE",
+    "LICENSE"
+  ],
+  "os": [
+    "win32"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepare-vendor": "node scripts/prepare.js",
+    "test": "node --test test/install.test.js"
+  },
+  "keywords": [
+    "agent-desktop",
+    "mcp",
+    "computer-use",
+    "record",
+    "screen-recording",
+    "automation",
+    "claude",
+    "codex",
+    "gemini",
+    "cursor"
+  ]
+}
