@@ -198,9 +198,21 @@ fn create_process(
         crate::system::interaction_lease::INTERACTION_LEASE_HANDLE_ENV,
     )
     .map_err(before_launch)?;
-    let startup = STARTUPINFOW {
-        cb: std::mem::size_of::<STARTUPINFOW>() as u32,
-        ..Default::default()
+    // Headless by default: unless the caller asked to activate it, the app's
+    // first window opens without taking the focus, so a person typing in
+    // another window keeps typing there.
+    let startup = if options.activate {
+        STARTUPINFOW {
+            cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+            ..Default::default()
+        }
+    } else {
+        STARTUPINFOW {
+            cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+            dwFlags: windows_sys::Win32::System::Threading::STARTF_USESHOWWINDOW,
+            wShowWindow: windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNOACTIVATE as u16,
+            ..Default::default()
+        }
     };
     let mut information = PROCESS_INFORMATION::default();
     let flags = if env_block.is_some() {

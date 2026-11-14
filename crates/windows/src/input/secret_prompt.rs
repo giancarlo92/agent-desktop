@@ -3,6 +3,11 @@
 //! and Save and continue / Cancel. What is typed goes back to the caller,
 //! which stores it in the system's secret store; it is never shown, logged or
 //! returned to an agent.
+//!
+//! The window appears on top without taking the focus, and its taskbar button
+//! flashes: whatever the person is typing elsewhere keeps going there, and
+//! never lands in the password box by accident. It takes the keyboard when the
+//! person clicks it, and gives it back when it closes.
 
 use std::cell::RefCell;
 
@@ -14,10 +19,11 @@ use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, ES_AUTOHSCROLL, ES_PASSWORD, GetForegroundWindow, GetMessageW,
-    GetSystemMetrics, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, KillTimer, MSG,
-    PostQuitMessage, RegisterClassExW, SM_CXSCREEN, SM_CYSCREEN, SendMessageW, SetForegroundWindow,
-    SetTimer, SetWindowTextW, TranslateMessage, WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_SETFONT,
+    DispatchMessageW, ES_AUTOHSCROLL, ES_PASSWORD, FLASHW_ALL, FLASHW_TIMERNOFG, FLASHWINFO,
+    FlashWindowEx, GetMessageW, GetSystemMetrics, GetWindowTextLengthW, GetWindowTextW,
+    IsDialogMessageW, KillTimer, MSG, PostQuitMessage, RegisterClassExW, SM_CXSCREEN, SM_CYSCREEN,
+    SW_SHOWNOACTIVATE, SendMessageW, SetForegroundWindow, SetTimer, SetWindowTextW, ShowWindow,
+    TranslateMessage, WA_INACTIVE, WM_ACTIVATE, WM_CLOSE, WM_COMMAND, WM_DESTROY, WM_SETFONT,
     WM_TIMER, WNDCLASSEXW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_EX_TOPMOST,
     WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
@@ -31,6 +37,8 @@ const TIMEOUT_MS: u32 = 5 * 60 * 1000;
 thread_local! {
     static EDIT: RefCell<HWND> = const { RefCell::new(std::ptr::null_mut()) };
     static ANSWER: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// The window that had the keyboard when the person clicked the prompt.
+    static RETURN_TO: RefCell<HWND> = const { RefCell::new(std::ptr::null_mut()) };
 }
 
 fn wide(text: &str) -> Vec<u16> {
@@ -44,9 +52,7 @@ fn scaled(value: i32) -> i32 {
 /// Asks for a secret; `None` when the person cancels or does not answer.
 pub(crate) fn ask(title: &str, message: &str) -> Result<Option<String>, AdapterError> {
     ANSWER.with(|answer| *answer.borrow_mut() = None);
-    // The window the script was working in gets the focus back afterwards, so
-    // the next keystrokes reach it and not whatever Windows activates next.
-    let previous = unsafe { GetForegroundWindow() };
+    RETURN_TO.with(|slot| *slot.borrow_mut() = std::ptr::null_mut());
     let class = wide("AgentDesktopSecretPrompt");
     let instance = unsafe { GetModuleHandleW(std::ptr::null()) };
     let mut definition: WNDCLASSEXW = unsafe { std::mem::zeroed() };
@@ -66,7 +72,7 @@ pub(crate) fn ask(title: &str, message: &str) -> Result<Option<String>, AdapterE
             WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
             class.as_ptr(),
             caption.as_ptr(),
-            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            WS_CAPTION | WS_SYSMENU,
             x,
             y,
             width,
@@ -130,8 +136,15 @@ pub(crate) fn ask(title: &str, message: &str) -> Result<Option<String>, AdapterE
     EDIT.with(|slot| *slot.borrow_mut() = edit);
     unsafe {
         SetTimer(window, TIMEOUT, TIMEOUT_MS, None);
-        SetForegroundWindow(window);
-        SetFocus(edit);
+        ShowWindow(window, SW_SHOWNOACTIVATE);
+        let flash = FLASHWINFO {
+            cbSize: std::mem::size_of::<FLASHWINFO>() as u32,
+            hwnd: window,
+            dwFlags: FLASHW_ALL | FLASHW_TIMERNOFG,
+            uCount: 0,
+            dwTimeout: 0,
+        };
+        FlashWindowEx(&flash);
     }
 
     let mut message_slot: MSG = unsafe { std::mem::zeroed() };
@@ -143,8 +156,9 @@ pub(crate) fn ask(title: &str, message: &str) -> Result<Option<String>, AdapterE
             }
         }
     }
-    if !previous.is_null() {
-        unsafe { SetForegroundWindow(previous) };
+    let return_to = RETURN_TO.with(|slot| *slot.borrow());
+    if !return_to.is_null() {
+        unsafe { SetForegroundWindow(return_to) };
     }
     Ok(ANSWER.with(|answer| answer.borrow_mut().take()))
 }
@@ -178,6 +192,17 @@ unsafe extern "system" fn procedure(
         }
         WM_COMMAND if (wparam & 0xFFFF) == CANCEL => {
             unsafe { DestroyWindow(hwnd) };
+            0
+        }
+        WM_ACTIVATE if (wparam & 0xFFFF) as u32 != WA_INACTIVE => {
+            let deactivated = lparam as HWND;
+            RETURN_TO.with(|slot| {
+                if slot.borrow().is_null() && !deactivated.is_null() {
+                    *slot.borrow_mut() = deactivated;
+                }
+            });
+            let edit = EDIT.with(|slot| *slot.borrow());
+            unsafe { SetFocus(edit) };
             0
         }
         WM_TIMER if wparam == TIMEOUT => {
