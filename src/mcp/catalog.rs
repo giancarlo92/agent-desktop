@@ -1,3 +1,4 @@
+// Modified in the desktop-recorder-mcp fork of agent-desktop (see NOTICE).
 //! MCP tools derived from the clap command tree, so the CLI stays the only definition of a command.
 
 use clap::{Arg, ArgAction, Command, CommandFactory};

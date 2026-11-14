@@ -18,12 +18,14 @@ What this fork adds or changes:
 Upstream files modified in this fork (each carries a notice; JSON cannot):
 - AGENTS.md
 - CHANGELOG.md
+- Cargo.lock
 - README.md
 - apps/docs/content/docs/commands/index.mdx
 - apps/docs/content/docs/commands/meta.json
 - apps/docs/content/docs/commands/observation.mdx
 - apps/docs/content/docs/index.mdx
 - apps/docs/content/docs/skills.mdx
+- crates/core/Cargo.toml
 - crates/core/src/adapter/input.rs
 - crates/core/src/commands/list_displays.rs
 - crates/core/src/commands/mod.rs
@@ -46,6 +48,7 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - skills/agent-desktop/references/commands-interaction.md
 - skills/agent-desktop/references/commands-observation.md
 - skills/agent-desktop/references/commands-system.md
+- src/Cargo.toml
 - src/batch/mod.rs
 - src/cli/contract_command_surface_tests.rs
 - src/cli/mod.rs
@@ -54,3 +57,4 @@ Upstream files modified in this fork (each carries a notice; JSON cannot):
 - src/dispatch/keyboard_mouse.rs
 - src/dispatch/mod.rs
 - src/dispatch/system.rs
+- src/mcp/catalog.rs
