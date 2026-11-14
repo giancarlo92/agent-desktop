@@ -47,8 +47,18 @@ fn commands(parent: &Command) -> impl Iterator<Item = &Command> {
         .filter(|sub| sub.get_name() != CLAP_HELP_SUBCOMMAND)
 }
 
+/// Commands that are never tools: an agent never stores or deletes a secret,
+/// a person does, at a terminal.
+const NOT_TOOLS: &[&[&str]] = &[&["secret", "set"], &["secret", "delete"]];
+
 fn collect(command: &Command, mut path: Vec<String>, found: &mut Vec<Tool>) {
     path.push(command.get_name().to_string());
+    if NOT_TOOLS
+        .iter()
+        .any(|blocked| blocked.iter().eq(path.iter()))
+    {
+        return;
+    }
     if command.has_subcommands() {
         for sub in commands(command) {
             collect(sub, path.clone(), found);

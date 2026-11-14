@@ -43,7 +43,7 @@ If the person said something about the task (a step they forgot, a value that ch
 
 A value that will be different next time is a parameter, not a fixed value: a name, an email, an amount, a date, a file name, a search term. Ask the person when it is not clear. Give each parameter an English `snake_case` name, a short question that explains it, and the recorded value as its example.
 
-- A password (`secure: true`) is never written in the script and never invented. Make it a parameter read from an environment variable or asked when the script runs.
+- A password (`secure: true`) is never written in the script and never invented. Use a saved secret by name: the script runs `secret fill <field ref> <name>`, and the person saves the value once with `agent-desktop secret set <name> --app <app> --site <site>` (see `commands-system`, section `secret`). The script can be shared: whoever runs it saves their own secret under the same name.
 - A choice among a fixed set (a size, a country) is a parameter whose question lists the valid options.
 
 ## 4. Start from a clean state
@@ -63,6 +63,7 @@ Find an element right before acting on it, every time: refs belong to one snapsh
 | `click` on a button, link, tab, menu item | `click` the element |
 | `click` with `state_after.checked` | `check` or `uncheck` the element (it is idempotent) |
 | `type` into a field | `set-value` the element with `value` (or the parameter). If the field refuses it, `click` it, `press ctrl+a`, then `type --headed` |
+| `type` with `secure: true` (a password) | `secret fill` the element with the secret's name |
 | `type` into a grid cell or a canvas editor ("Cell Editor") | Select the cell, `press` the first character so the editor appears, then `set-value` the editor with the whole value, then `press` the key the person pressed (`return`, `tab`) |
 | `select` | `select` the combo box with `value` |
 | `press` (`return`, `ctrl+s`, `tab`) | `press` the same `keys`, to the app's window |

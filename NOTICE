@@ -11,6 +11,7 @@ What this fork adds or changes:
   on-screen indicator with a Stop button, shown by default;
 - stroke: replaying a drawn path;
 - recorder fixes, display numbers in list-displays, a radio button's checked state;
+- secret: passwords stored once in the system secret store and written into fields by name;
 - the recording-to-script and script-repair guides;
 - packages/desktop-recorder-mcp: an installer for AI agents.
 

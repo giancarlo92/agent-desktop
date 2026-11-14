@@ -16,6 +16,16 @@ Then open a new conversation and ask, in your own words:
 
 While it records, a small red indicator at the bottom of the screen shows the time and a Stop button.
 
+## Passwords
+
+The tool never records a password or writes one into a script. You save each one once, under a name, in your system's own secret store (Windows Credential Manager, the macOS Keychain, the Secret Service on Linux):
+
+```bash
+agent-desktop secret set bank-login --app chrome.exe --site login.mybank.com
+```
+
+It asks for the value twice without showing it. Scripts and agents then write it into the password field by name (`secret fill <field> bank-login`) and never see it; it is refused anywhere but a password field of that app and site. Agents can use a saved secret but never save, read or delete one.
+
 ## Other commands
 
 ```bash

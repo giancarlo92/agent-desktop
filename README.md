@@ -126,7 +126,7 @@ Global flags given to `mcp`, such as `--session`, `--headed` or `--trace`, apply
 
 ## Commands
 
-agent-desktop has 63 command names, 59 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button. `record` and `stroke` run on Windows only and return `PLATFORM_NOT_SUPPORTED` elsewhere. [Commands](https://agent-browser.dev/desktop/commands) documents each one.
+agent-desktop has 64 command names, 60 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button. `record` and `stroke` run on Windows only and return `PLATFORM_NOT_SUPPORTED` elsewhere. [Commands](https://agent-browser.dev/desktop/commands) documents each one.
 
 | Group | Commands |
 |---|---|

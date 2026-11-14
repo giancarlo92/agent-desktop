@@ -111,6 +111,10 @@ pub(crate) fn parse_command(item: BatchCommand) -> Result<Commands, AppError> {
             "Enable or disable it once for the selected session before running the batch.",
         )),
         "trace" => parse_trace(item.args).map(Commands::Trace),
+        "secret" => Err(AppError::invalid_input_with_suggestion(
+            "Secrets cannot be used inside a batch",
+            "Run 'agent-desktop secret fill' as its own call.",
+        )),
         "record" => Err(AppError::invalid_input_with_suggestion(
             "A recording session cannot run inside a batch",
             "Run 'agent-desktop record' as its own call.",

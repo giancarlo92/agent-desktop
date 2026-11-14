@@ -23,6 +23,7 @@ use crate::cli_args::{
     },
     record::RecordArgs,
     sandbox::SandboxArgs,
+    secret::SecretArgs,
     session::SessionArgs,
     skills::SkillsArgs,
     stroke::StrokeArgs,
@@ -160,6 +161,10 @@ pub(crate) enum Commands {
         about = "Record the user's own clicks, typing, key presses and scrolls (and a video) to a JSON Lines file until stopped; record start/stop run it in the background"
     )]
     Record(RecordArgs),
+    #[command(
+        about = "Store passwords once and write them into fields by name, never showing them (secret set/list/delete/fill)"
+    )]
+    Secret(SecretArgs),
     #[command(about = "Show adapter health, platform info, and permission state")]
     Status,
     #[command(
@@ -258,6 +263,7 @@ impl Commands {
             Self::ClipboardClear => CommandMetadata::new("clipboard-clear", false),
             Self::Wait(_) => CommandMetadata::new("wait", false),
             Self::Record(_) => CommandMetadata::new("record", false),
+            Self::Secret(_) => CommandMetadata::new("secret", false),
             Self::Status => CommandMetadata::new("status", false),
             Self::Permissions(_) => CommandMetadata::new("permissions", false),
             Self::Version => CommandMetadata::new("version", false),
@@ -348,6 +354,7 @@ impl Commands {
             | Self::ListNotifications(_)
             | Self::Wait(_)
             | Self::Record(_)
+            | Self::Secret(_)
             | Self::Status
             | Self::Version
             | Self::Skills(_) => false,
