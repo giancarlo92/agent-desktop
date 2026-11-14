@@ -100,6 +100,12 @@ pub trait InputOps: Send + Sync {
     ) -> Result<RecordSummary, AdapterError> {
         Err(AdapterError::not_supported("record_input"))
     }
+
+    /// Asks the person at the screen for a secret in a window of the
+    /// platform's own, its characters hidden. `Ok(None)` when they cancel.
+    fn ask_secret(&self, _title: &str, _message: &str) -> Result<Option<String>, AdapterError> {
+        Err(AdapterError::not_supported("ask_secret"))
+    }
 }
 
 #[cfg(test)]

@@ -39,6 +39,8 @@ pub(crate) mod keyboard;
 pub(crate) mod mouse;
 pub(crate) mod record;
 mod release_state;
+#[cfg(target_os = "windows")]
+pub(crate) mod secret_prompt;
 pub(crate) mod stroke;
 
 #[cfg(all(test, target_os = "windows"))]

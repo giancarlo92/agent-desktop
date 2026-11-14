@@ -59,3 +59,9 @@ fn legacy_string_clipboard_methods_are_gone() {
         "set_clipboard_content must remain the write surface"
     );
 }
+
+#[test]
+fn default_ask_secret_is_not_supported() {
+    let err = DefaultOnly.ask_secret("title", "message").unwrap_err();
+    assert_eq!(err.code, ErrorCode::PlatformNotSupported);
+}

@@ -22,6 +22,7 @@ const NON_COMMAND_MODULES: &[&str] = &[
     "query",
     "record_background",
     "record_display",
+    "secret_ask",
     "secret_policy",
     "secret_store",
     "find_live_test_support",

@@ -18,13 +18,14 @@ While it records, a small red indicator at the bottom of the screen shows the ti
 
 ## Passwords
 
-The tool never records a password or writes one into a script. You save each one once, under a name, in your system's own secret store (Windows Credential Manager, the macOS Keychain, the Secret Service on Linux):
+The tool never records a password or writes one into a script. A script or an agent asks for a password by name (`secret fill <field> bank-login`). The first time, a small window asks you to type it once; it is saved in your system's own secret store (Windows Credential Manager, the macOS Keychain, the Secret Service on Linux), bound to that app and site, and the task goes on. From then on it is filled on its own. Agents never see it, and it is refused anywhere but a password field of that app and site.
+
+To save one ahead of time, or change it:
 
 ```bash
 agent-desktop secret set bank-login --app chrome.exe --site login.mybank.com
+agent-desktop secret delete bank-login
 ```
-
-It asks for the value twice without showing it. Scripts and agents then write it into the password field by name (`secret fill <field> bank-login`) and never see it; it is refused anywhere but a password field of that app and site. Agents can use a saved secret but never save, read or delete one.
 
 ## Other commands
 

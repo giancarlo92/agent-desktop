@@ -19,6 +19,7 @@ use crate::context::CommandContext;
 const MAX_NAME: usize = 64;
 const MAX_SECRET: usize = 1_024;
 const ADDRESS_BAR: &str = "Address and search bar";
+const PROMPT_SETTLE_MS: u64 = 600;
 
 pub struct SetArgs {
     pub name: String,
@@ -62,17 +63,7 @@ pub fn set(args: SetArgs) -> Result<Value, AppError> {
         site: args.site.clone(),
         any_field: args.any_field,
     };
-    secret_store::save(&args.name, &secret)?;
-    let info = SecretInfo {
-        name: args.name.clone(),
-        app: args.app,
-        site: args.site,
-        any_field: args.any_field,
-        saved_ms: now_ms(),
-    };
-    let index = secret_store::default_index()?;
-    let entries = secret_store::with_entry(secret_store::read_index(&index), info.clone());
-    secret_store::write_index(&index, &entries)?;
+    let info = remember(&args.name, &secret)?;
     Ok(json!({ "saved": info }))
 }
 
@@ -99,17 +90,21 @@ pub fn fill(
     context: &CommandContext,
 ) -> Result<Value, AppError> {
     valid_name(&args.name)?;
-    let Some(secret) = secret_store::load(&args.name)? else {
-        return Err(AppError::invalid_input_with_suggestion(
-            format!("No secret is saved as '{}'", args.name),
-            "A person saves it once with: agent-desktop secret set <name>",
-        ));
-    };
     let entry = load_ref_entry(&args.ref_id, context)?;
-    let address = secret
-        .site
-        .as_ref()
-        .and_then(|_| browser_address(&entry, adapter, context));
+    let stored = secret_store::load(&args.name)?;
+    let needs_address = stored.as_ref().is_none_or(|secret| secret.site.is_some());
+    let address = if needs_address {
+        browser_address(&entry, adapter, context)
+    } else {
+        None
+    };
+    let (secret, asked) = match stored {
+        Some(secret) => (secret, false),
+        None => (
+            ask_first_use(&args.name, &entry, address.as_deref(), adapter)?,
+            true,
+        ),
+    };
     let facts = FieldFacts {
         role: &entry.identity.role,
         states: &entry.capabilities.states,
@@ -127,7 +122,22 @@ pub fn fill(
     // The write goes through type and set-value themselves, so it keeps their
     // input policy, verification and errors.
     let typed = context.is_headed();
+    if asked && typed {
+        // The prompt just closed: let the window it hands the focus back to
+        // become active before keys are sent to it.
+        std::thread::sleep(std::time::Duration::from_millis(PROMPT_SETTLE_MS));
+    }
     let outcome = if typed {
+        // Keys go to the focused element only, so the field gets the focus
+        // first (a script usually comes from another field).
+        crate::commands::focus::execute(
+            crate::commands::helpers::RefArgs {
+                ref_id: args.ref_id.clone(),
+                timeout_ms: args.timeout_ms,
+            },
+            adapter,
+            context,
+        )?;
         crate::commands::type_text::execute(
             crate::commands::type_text::TypeArgs {
                 ref_id: args.ref_id,
@@ -159,6 +169,9 @@ pub fn fill(
             }
             value["secret"] = json!(args.name);
             value["method"] = json!(if typed { "typed" } else { "set" });
+            if asked {
+                value["saved_now"] = json!(true);
+            }
             if !typed {
                 value["note"] = json!(
                     "The value was set directly. A page that reacts to typing (a React or Vue \
@@ -169,6 +182,77 @@ pub fn fill(
         }
         Err(error) => Err(redact_error(error, &secret.secret)),
     }
+}
+
+/// The first time a secret is needed and none is saved under its name: the
+/// person types it in a window of its own (never through the agent), and it
+/// is saved bound to this field's app and site, then used.
+fn ask_first_use(
+    name: &str,
+    entry: &crate::RefEntry,
+    address: Option<&str>,
+    adapter: &dyn PlatformAdapter,
+) -> Result<StoredSecret, AppError> {
+    let site = address
+        .map(crate::commands::secret_policy::host)
+        .filter(|host| !host.is_empty());
+    let mut secret = StoredSecret {
+        secret: String::new(),
+        app: entry.source.source_app.clone(),
+        site,
+        any_field: false,
+    };
+    let facts = FieldFacts {
+        role: &entry.identity.role,
+        states: &entry.capabilities.states,
+        app: entry.source.source_app.as_deref(),
+        address,
+    };
+    if let Some(reason) = refusal(&secret, &facts) {
+        return Err(AppError::invalid_input(format!(
+            "No secret is saved as '{name}', and none is asked for here: {reason}"
+        )));
+    }
+    let place = match (&secret.app, &secret.site) {
+        (Some(app), Some(site)) => format!("{app} on {site}"),
+        (Some(app), None) => app.clone(),
+        (None, Some(site)) => site.clone(),
+        (None, None) => "this field".into(),
+    };
+    let message = format!(
+        "A script or an agent needs the password saved as '{name}', for {place}.\n\n\
+         Type it once: it is kept encrypted by your system and used only there, \
+         and the agent never sees it."
+    );
+    let Some(value) = crate::commands::secret_ask::ask(adapter, &message)? else {
+        return Err(AppError::invalid_input(format!(
+            "The secret '{name}' was not given (the window was cancelled or closed); nothing was written"
+        )));
+    };
+    if value.len() > MAX_SECRET {
+        return Err(AppError::invalid_input(format!(
+            "A secret has 1 to {MAX_SECRET} bytes"
+        )));
+    }
+    secret.secret = value;
+    remember(name, &secret)?;
+    Ok(secret)
+}
+
+/// Saves a secret and its line in the index.
+fn remember(name: &str, secret: &StoredSecret) -> Result<SecretInfo, AppError> {
+    secret_store::save(name, secret)?;
+    let info = SecretInfo {
+        name: name.to_string(),
+        app: secret.app.clone(),
+        site: secret.site.clone(),
+        any_field: secret.any_field,
+        saved_ms: now_ms(),
+    };
+    let index = secret_store::default_index()?;
+    let entries = secret_store::with_entry(secret_store::read_index(&index), info.clone());
+    secret_store::write_index(&index, &entries)?;
+    Ok(info)
 }
 
 /// The address bar's text in the field's browser window, if it has one.

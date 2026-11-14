@@ -307,4 +307,9 @@ impl InputOps for WindowsAdapter {
     ) -> Result<RecordSummary, AdapterError> {
         crate::input::record::record_input(request, sink)
     }
+
+    #[cfg(target_os = "windows")]
+    fn ask_secret(&self, title: &str, message: &str) -> Result<Option<String>, AdapterError> {
+        crate::input::secret_prompt::ask(title, message)
+    }
 }

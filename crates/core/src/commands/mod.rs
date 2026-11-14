@@ -68,6 +68,7 @@ mod screenshot_tests;
 pub mod scroll;
 pub mod scroll_to;
 pub mod secret;
+pub mod secret_ask;
 pub mod secret_policy;
 pub mod secret_store;
 pub mod select;

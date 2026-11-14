@@ -43,7 +43,7 @@ If the person said something about the task (a step they forgot, a value that ch
 
 A value that will be different next time is a parameter, not a fixed value: a name, an email, an amount, a date, a file name, a search term. Ask the person when it is not clear. Give each parameter an English `snake_case` name, a short question that explains it, and the recorded value as its example.
 
-- A password (`secure: true`) is never written in the script and never invented. Use a saved secret by name: the script runs `secret fill <field ref> <name>`, and the person saves the value once with `agent-desktop secret set <name> --app <app> --site <site>` (see `commands-system`, section `secret`). The script can be shared: whoever runs it saves their own secret under the same name.
+- A password (`secure: true`) is never written in the script and never invented. Use a secret by name: the script runs `secret fill <field ref> <name>` (with `--headed` on a web form), with an English name that says what it is for (`bank-login`). The first run opens a small window where the person types the password once; it is saved bound to that app and site, and every later run fills it on its own (see `commands-system`, section `secret`). A password box often has no name: find it by `native_id`. The script can be shared: whoever runs it is asked for their own password the first time.
 - A choice among a fixed set (a size, a country) is a parameter whose question lists the valid options.
 
 ## 4. Start from a clean state
