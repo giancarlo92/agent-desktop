@@ -102,3 +102,18 @@ pub(crate) fn give_back(person: HWND, taken_by: HWND) {
         unsafe { AttachThreadInput(own, theirs, 0) };
     }
 }
+
+/// Whether a window is the taskbar or the window switcher: a click there is
+/// the person choosing a window.
+pub(crate) fn is_taskbar(window: HWND) -> bool {
+    let mut class = [0u16; 64];
+    let length = unsafe { GetClassNameW(window, class.as_mut_ptr(), class.len() as i32) };
+    if length <= 0 {
+        return false;
+    }
+    let class = String::from_utf16_lossy(&class[..length as usize]);
+    matches!(
+        class.as_str(),
+        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "XamlExplorerHostIslandWindow"
+    )
+}

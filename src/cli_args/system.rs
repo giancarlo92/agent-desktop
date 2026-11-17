@@ -246,7 +246,7 @@ pub(crate) struct WaitEventArgs {
     #[arg(
         long,
         name = "window-id",
-        help = "Optional: narrow --event window-opened/window-closed/focus-changed to one window ID"
+        help = "Optional: read only this window for a --text wait, or narrow --event window-opened/window-closed/focus-changed to one window ID"
     )]
     pub window_id: Option<String>,
 }

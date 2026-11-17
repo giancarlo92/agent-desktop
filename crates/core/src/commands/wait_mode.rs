@@ -18,6 +18,7 @@ pub(crate) enum WaitMode {
         text: String,
         count: Option<usize>,
         app: Option<String>,
+        window_id: Option<String>,
     },
     Menu {
         app: Option<String>,
@@ -90,6 +91,7 @@ impl WaitMode {
                 text,
                 count: args.predicate.count,
                 app: args.app,
+                window_id: args.mode.window_id,
             });
         }
         Err(missing_wait_mode())

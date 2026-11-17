@@ -64,12 +64,14 @@ pub fn execute(args: LaunchArgs, adapter: &dyn PlatformAdapter) -> Result<Value,
         let granted = deadline.remaining();
         let endpoint = verify_cdp_endpoint(port, deadline, granted, &launched, adapter)?;
         let opened = background_pages.as_ref().map(|pages| {
-            let opened = crate::system::cdp_page::open_in_background(
-                &endpoint.websocket_url,
-                pages,
-                deadline.remaining(),
-            );
-            adapter.keep_new_windows_behind(launched.pid, deadline);
+            let mut opened = false;
+            adapter.while_new_windows_stay_behind(launched.pid, &mut || {
+                opened = crate::system::cdp_page::open_in_background(
+                    &endpoint.websocket_url,
+                    pages,
+                    deadline.remaining(),
+                );
+            });
             opened
         });
         if opened == Some(false) {

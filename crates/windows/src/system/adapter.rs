@@ -195,8 +195,14 @@ impl SystemOps for WindowsAdapter {
     }
 
     #[cfg(target_os = "windows")]
-    fn keep_new_windows_behind(&self, pid: agent_desktop_core::ProcessId, _deadline: Deadline) {
-        if let Some(guard) = crate::actions::focus_guard::Guard::for_new_window(u32::from(pid)) {
+    fn while_new_windows_stay_behind(
+        &self,
+        pid: agent_desktop_core::ProcessId,
+        work: &mut dyn FnMut(),
+    ) {
+        let guard = crate::actions::focus_guard::Guard::for_new_window(u32::from(pid));
+        work();
+        if let Some(guard) = guard {
             guard.finish();
         }
     }

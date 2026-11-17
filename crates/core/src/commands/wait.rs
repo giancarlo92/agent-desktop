@@ -77,11 +77,17 @@ pub fn execute(
             context,
         ),
         WaitMode::Window { title, app } => wait_for_window(title, app, timeout_ms, adapter),
-        WaitMode::Text { text, count, app } => wait_for_text(
+        WaitMode::Text {
+            text,
+            count,
+            app,
+            window_id,
+        } => wait_for_text(
             TextWaitInput {
                 text,
                 expected_count: count,
                 app,
+                window_id,
                 timeout_ms,
             },
             adapter,
@@ -192,6 +198,11 @@ struct TextWaitInput {
     text: String,
     expected_count: Option<usize>,
     app: Option<String>,
+    /// The one window to read. Without it the application's default window
+    /// is read, which is the wrong one when the application has several
+    /// instances running (a browser with a profile of its own beside the
+    /// person's).
+    window_id: Option<String>,
     timeout_ms: u64,
 }
 
@@ -204,6 +215,7 @@ fn wait_for_text(
         text,
         expected_count,
         app,
+        window_id,
         timeout_ms,
     } = input;
     let start = Instant::now();
@@ -221,7 +233,13 @@ fn wait_for_text(
     let mut last_error = None;
 
     loop {
-        match snapshot::build(adapter, &opts, app.as_deref(), None, deadline) {
+        match snapshot::build(
+            adapter,
+            &opts,
+            app.as_deref(),
+            window_id.as_deref(),
+            deadline,
+        ) {
             Ok(mut result) => {
                 let matches = wait_text_match::find(&result.tree, &normalized_text, expected_count);
                 let matched = match expected_count {

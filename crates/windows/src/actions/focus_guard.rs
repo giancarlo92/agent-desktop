@@ -34,14 +34,14 @@ use windows_sys::Win32::System::Threading::{
     OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VK_LBUTTON, VK_LWIN, VK_MBUTTON, VK_MENU, VK_RBUTTON, VK_RWIN,
+    GetAsyncKeyState, VK_CONTROL, VK_LBUTTON, VK_LMENU, VK_LWIN, VK_MBUTTON, VK_RBUTTON, VK_RWIN,
+    VK_TAB,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GA_ROOT, GUITHREADINFO, GetAncestor, GetClassNameW,
-    GetCursorPos, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, HC_ACTION,
-    KBDLLHOOKSTRUCT, LLKHF_INJECTED, LLKHF_UP, MSG, MsgWaitForMultipleObjects, PM_REMOVE,
-    PeekMessageW, QS_ALLINPUT, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
-    WH_KEYBOARD_LL, WindowFromPoint,
+    CallNextHookEx, DispatchMessageW, GA_ROOT, GUITHREADINFO, GetAncestor, GetCursorPos,
+    GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, HC_ACTION, KBDLLHOOKSTRUCT,
+    LLKHF_INJECTED, LLKHF_UP, MSG, MsgWaitForMultipleObjects, PM_REMOVE, PeekMessageW, QS_ALLINPUT,
+    SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL, WindowFromPoint,
 };
 
 /// How long after an action the target's activation is still watched for:
@@ -168,12 +168,15 @@ impl Watch {
             if !root.is_null() && target_behind && self.is_target(process_of(root)) {
                 self.person_click_on_target = Some(Instant::now());
             }
-            if !root.is_null() && is_taskbar(root) {
+            if !root.is_null() && crate::actions::behind::is_taskbar(root) {
                 self.person_switch_key = Some(Instant::now());
             }
         }
         self.button_down = down;
-        if key_down(VK_MENU) || key_down(VK_LWIN) || key_down(VK_RWIN) {
+        // Alt+Tab or the Windows key, never Alt alone: AltGr (Ctrl+Alt) types
+        // characters on many keyboard layouts.
+        let alt_tab = key_down(VK_TAB) && key_down(VK_LMENU) && !key_down(VK_CONTROL);
+        if alt_tab || key_down(VK_LWIN) || key_down(VK_RWIN) {
             self.person_switch_key = Some(Instant::now());
         }
     }
@@ -192,15 +195,21 @@ impl Watch {
             return;
         }
         if !self.is_target(process_of(now)) {
-            // The person moved to another window: their taskbar click was for it.
-            self.person = now as isize;
-            self.person_switch_key = None;
+            // The person moved to another window: their taskbar click was for
+            // it. The taskbar itself comes forward for an instant on the way.
+            if !crate::actions::behind::is_taskbar(now) {
+                self.person = now as isize;
+                self.person_switch_key = None;
+            }
             return;
         }
         if self.released || self.person == 0 {
             return;
         }
-        if recent(self.person_click_on_target) || recent(self.person_switch_key) {
+        // A window that is only just appearing was not chosen by anyone: a
+        // guard over a launch never lets go.
+        let chosen = recent(self.person_click_on_target) || recent(self.person_switch_key);
+        if chosen && self.target.to_back.is_none() {
             self.released = true;
             if self.debug {
                 eprintln!(
@@ -216,19 +225,6 @@ impl Watch {
             eprintln!("guard: taken tick={}, given back: {back}", tick());
         }
     }
-}
-
-fn is_taskbar(window: HWND) -> bool {
-    let mut class = [0u16; 64];
-    let length = unsafe { GetClassNameW(window, class.as_mut_ptr(), class.len() as i32) };
-    if length <= 0 {
-        return false;
-    }
-    let class = String::from_utf16_lossy(&class[..length as usize]);
-    matches!(
-        class.as_str(),
-        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "XamlExplorerHostIslandWindow"
-    )
 }
 
 /// A guard that runs until `finish`, then for its settle time.

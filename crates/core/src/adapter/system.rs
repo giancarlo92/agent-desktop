@@ -112,10 +112,14 @@ pub trait SystemOps: Send + Sync {
         Err(AdapterError::not_supported("process_owns_tcp_listener"))
     }
 
-    /// Keeps the windows a running process is about to show behind the
-    /// person's windows until they have settled. A platform where a new
-    /// window cannot take the foreground has nothing to do.
-    fn keep_new_windows_behind(&self, _pid: crate::ProcessId, _deadline: Deadline) {}
+    /// Runs `work`, which makes a running process show a new window, and
+    /// keeps that window behind the person's until it has settled. The guard
+    /// starts before the work, so it knows which window the person had in
+    /// front. A platform where a new window cannot take the foreground just
+    /// runs the work.
+    fn while_new_windows_stay_behind(&self, _pid: crate::ProcessId, work: &mut dyn FnMut()) {
+        work();
+    }
 
     fn process_state(
         &self,
