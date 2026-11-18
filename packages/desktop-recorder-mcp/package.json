@@ -1,8 +1,14 @@
 {
   "name": "desktop-recorder-mcp",
   "version": "0.1.0",
-  "description": "Install agent-desktop with record (events, video, background start/stop, an on-screen indicator) into your AI agents: Claude Code, Codex, Gemini CLI, Cursor, VS Code, Windsurf and Claude Desktop. A fork of vercel-labs/agent-desktop.",
+  "description": "Install agent-desktop with record, saved passwords and a background-only mode (never your mouse, keyboard or focus) into your AI agents: Claude Code, Codex, Gemini CLI, Cursor, VS Code, Windsurf and Claude Desktop. A fork of vercel-labs/agent-desktop. Windows.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/giancarlo92/agent-desktop.git",
+    "directory": "packages/desktop-recorder-mcp"
+  },
+  "homepage": "https://github.com/giancarlo92/agent-desktop/tree/feat/record/packages/desktop-recorder-mcp#readme",
   "bin": {
     "desktop-recorder-mcp": "cli.js"
   },
