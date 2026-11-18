@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 
 const config = require('./config');
 const { agents, onPath } = require('./agents');
@@ -90,35 +90,66 @@ function removeSkills(agent) {
 }
 
 // Claude Code and Codex rewrite their own configuration while they run: their CLIs change it safely.
+// On Windows those CLIs are npm's .cmd scripts, which only the command shell can run, so each call is
+// one command line built here, every part quoted (see commandLine). A value that cannot be passed that
+// way falls back to editing the configuration file, as for the other agents.
+function cliArgs(agent, spec) {
+  const env = Object.entries(spec.env).flatMap(([key, value]) => ['--env', `${key}=${value}`]);
+  if (agent.id === 'claude-code') {
+    return {
+      remove: ['claude', 'mcp', 'remove', SERVER, '--scope', 'user'],
+      add: ['claude', 'mcp', 'add', SERVER, '--scope', 'user', ...env, '--', spec.command, ...spec.args],
+    };
+  }
+  return {
+    remove: ['codex', 'mcp', 'remove', SERVER],
+    add: ['codex', 'mcp', 'add', SERVER, ...env, '--', spec.command, ...spec.args],
+  };
+}
+
+function usesCli(agent, options) {
+  return options.useCli && agent.cli && ['claude-code', 'codex'].includes(agent.id) && onPath(agent.cli, options.env);
+}
+
 function addServer(agent, where, options) {
   const spec = server(where);
-  if (options.useCli && agent.id === 'claude-code' && onPath('claude', options.env)) {
-    try { execFileSync('claude', ['mcp', 'remove', SERVER, '--scope', 'user'], { stdio: 'ignore', shell: true }); } catch (_) { /* absent */ }
-    const json = JSON.stringify({ type: 'stdio', command: spec.command, args: spec.args, env: spec.env });
-    execFileSync('claude', ['mcp', 'add-json', SERVER, quote(json), '--scope', 'user'], { stdio: 'ignore', shell: true });
-    return;
-  }
-  if (options.useCli && agent.id === 'codex' && onPath('codex', options.env)) {
-    try { execFileSync('codex', ['mcp', 'remove', SERVER], { stdio: 'ignore', shell: true }); } catch (_) { /* absent */ }
-    const env = Object.entries(spec.env).flatMap(([k, v]) => ['--env', quote(`${k}=${v}`)]);
-    execFileSync('codex', ['mcp', 'add', SERVER, ...env, '--', quote(spec.command), ...spec.args], { stdio: 'ignore', shell: true });
-    return;
+  if (usesCli(agent, options)) {
+    const calls = cliArgs(agent, spec);
+    const add = commandLine(calls.add);
+    if (add) {
+      try { run(commandLine(calls.remove), options); } catch (_) { /* not there yet */ }
+      run(add, options);
+      return;
+    }
   }
   config.add(agent.mcp, SERVER, spec);
 }
 
 function removeServer(agent, options) {
-  if (options.useCli && agent.id === 'claude-code' && onPath('claude', options.env)) {
-    try { execFileSync('claude', ['mcp', 'remove', SERVER, '--scope', 'user'], { stdio: 'ignore', shell: true }); return true; } catch (_) { return false; }
-  }
-  if (options.useCli && agent.id === 'codex' && onPath('codex', options.env)) {
-    try { execFileSync('codex', ['mcp', 'remove', SERVER], { stdio: 'ignore', shell: true }); return true; } catch (_) { return false; }
+  if (usesCli(agent, options)) {
+    try { run(commandLine(cliArgs(agent, server(layout(options.home))).remove), options); return true; } catch (_) { return false; }
   }
   return config.remove(agent.mcp, SERVER);
 }
 
-function quote(text) {
-  return `"${String(text).replace(/"/g, '\\"')}"`;
+/**
+ * One command line for the command shell, or null when a part cannot be passed through it safely.
+ * Plain parts go as they are; the rest in double quotes, inside which the shell takes &, |, <, >, (, )
+ * and spaces literally. A part with ", %, ! or ^ is refused: the shell would read those even in quotes.
+ */
+function commandLine(parts) {
+  const quoted = [];
+  for (const part of parts) {
+    const text = String(part);
+    if (/^[A-Za-z0-9_.:\\/=@+,-]+$/.test(text)) quoted.push(text);
+    else if (/["%!^\r\n]/.test(text) || text.endsWith('\\')) return null;
+    else quoted.push(`"${text}"`);
+  }
+  return quoted.join(' ');
+}
+
+function run(line, options) {
+  execSync(line, { stdio: 'ignore', windowsHide: true, env: options.env });
 }
 
 /** Installs the program and sets up each chosen agent. Returns one line of result per agent. */
@@ -178,4 +209,4 @@ function status(options) {
   return lines;
 }
 
-module.exports = { install, uninstall, status, layout, server, SERVER };
+module.exports = { commandLine, install, uninstall, status, layout, server, SERVER };

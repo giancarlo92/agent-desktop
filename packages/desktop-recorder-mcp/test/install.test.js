@@ -104,3 +104,43 @@ test('status says what is set up', () => {
   assert.ok(lines.some((l) => /^Claude Code: found, MCP set up, skills installed/.test(l)), lines.join('\n'));
   assert.ok(lines.some((l) => /^Codex \(ChatGPT\): found, MCP not set up/.test(l)), lines.join('\n'));
 });
+
+test('a command line quotes what needs it and refuses what the shell would still read', () => {
+  const { commandLine } = require('../lib/install');
+  assert.strictEqual(
+    commandLine(['claude', 'mcp', 'add', 'x', '--env', 'K=C:\\Users\\Ana\\.tool', '--', 'C:\\Program Files (x86)\\a & b\\t.exe', 'mcp']),
+    'claude mcp add x --env K=C:\\Users\\Ana\\.tool -- "C:\\Program Files (x86)\\a & b\\t.exe" mcp'
+  );
+  for (const unsafe of ['a"b', '%PATH%', 'wow!', 'x^y', 'line\nbreak', 'C:\\dir with space\\']) {
+    assert.strictEqual(commandLine(['claude', unsafe]), null, unsafe);
+  }
+});
+
+test('the agents CLIs get every argument intact, through npm .cmd scripts, without a Node warning', { skip: process.platform !== 'win32' }, () => {
+  const { spawnSync } = require('child_process');
+  const { home, env } = fakeHome();
+  const bin = path.join(home, 'npm-bin');
+  fs.mkdirSync(bin);
+  const log = path.join(home, 'calls.jsonl');
+  fs.writeFileSync(path.join(bin, 'record.js'), `require('fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n');`);
+  for (const cli of ['claude', 'codex']) {
+    // The shape of a script npm installs for a global command.
+    fs.writeFileSync(path.join(bin, `${cli}.cmd`), `@ECHO off\r\n"${process.execPath}" "%~dp0\\record.js" ${cli} %*\r\n`);
+  }
+  const homeWithSpace = path.join(home, 'Ana & Co (work)');
+  fs.mkdirSync(homeWithSpace);
+  const script = `
+    const { install } = require(${JSON.stringify(path.join(__dirname, '..', 'lib', 'install'))});
+    install(['claude-code', 'codex'], { home: ${JSON.stringify(homeWithSpace)}, env: process.env, useCli: true, log: () => {} });`;
+  const childEnv = { ...process.env, ...env, PATH: `${bin};${process.env.PATH}` };
+  const child = spawnSync(process.execPath, ['-e', script], { env: childEnv, encoding: 'utf8' });
+  assert.strictEqual(child.status, 0, child.stderr);
+  const stderr = child.stderr;
+  const calls = read(log).trim().split('\n').map((line) => JSON.parse(line));
+  const where = layout(homeWithSpace);
+  assert.deepStrictEqual(calls.find((c) => c[0] === 'claude' && c[2] === 'add'),
+    ['claude', 'mcp', 'add', SERVER, '--scope', 'user', '--env', `AGENT_DESKTOP_HOME=${where.state}`, '--', where.exe, 'mcp']);
+  assert.deepStrictEqual(calls.find((c) => c[0] === 'codex' && c[2] === 'add'),
+    ['codex', 'mcp', 'add', SERVER, '--env', `AGENT_DESKTOP_HOME=${where.state}`, '--', where.exe, 'mcp']);
+  assert.ok(!/DEP0190|DeprecationWarning/.test(stderr || ''), stderr);
+});
