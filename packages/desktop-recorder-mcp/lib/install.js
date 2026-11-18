@@ -35,6 +35,7 @@ function installProgram(where, log) {
   if (!fs.existsSync(source)) throw new Error(`The package has no program (${source}); run npm run prepare-vendor`);
   fs.mkdirSync(where.bin, { recursive: true });
   fs.mkdirSync(where.state, { recursive: true });
+  makePrivate(where.state);
   try {
     fs.copyFileSync(source, where.exe);
   } catch (error) {
@@ -44,6 +45,29 @@ function installProgram(where, log) {
     throw error;
   }
   log(`Program: ${where.exe}`);
+}
+
+/**
+ * agent-desktop keeps its state (snapshots, refs) only in a folder no one else can open, and refuses
+ * one it finds open to others: it never widens or repairs one it did not make. Other tools may grant
+ * themselves access to folders under the person's home (the Codex sandbox gives its own group
+ * access to ~/.desktop-recorder-mcp), and a folder made here would inherit that. So the state folder
+ * stops inheriting and is opened only to the person, SYSTEM and Administrators, the same three
+ * agent-desktop sets on the folders it makes; what is already inside goes back to inheriting from it.
+ */
+function makePrivate(dir) {
+  if (process.platform !== 'win32') {
+    fs.chmodSync(dir, 0o700);
+    return;
+  }
+  // Windows' own programs by full path: another whoami (Git's, for one) may come first on PATH.
+  const system32 = path.join(process.env.SystemRoot || process.env.windir || 'C:\\Windows', 'System32');
+  const user = execFileSync(path.join(system32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true })
+    .trim().split(',').pop().replace(/"/g, '');
+  if (!/^S-1-5-[\d-]+$/.test(user)) throw new Error(`could not read your account's id to protect ${dir}`);
+  const icacls = (...args) => execFileSync(path.join(system32, 'icacls.exe'), args, { stdio: 'ignore', windowsHide: true });
+  icacls(dir, '/inheritance:r', '/grant:r', `*${user}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F');
+  if (fs.readdirSync(dir).length) icacls(path.join(dir, '*'), '/reset', '/T', '/C', '/Q');
 }
 
 function version(exe) {

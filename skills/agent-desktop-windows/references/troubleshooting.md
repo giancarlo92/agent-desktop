@@ -29,13 +29,19 @@ Fix: run your terminal elevated to the target's level. See
 
 ## "private file DACL grants an untrusted principal"
 
-agent-desktop keeps its refs, snapshots and recordings in a private state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`) and refuses any file there that another account can read. Codex CLI's Windows sandbox grants its group (`<computer>\CodexSandboxUsers`) read access to folders its sessions touch, including that one, so every later command fails with this error, from Codex or not. Remove the grant, then run the command again:
+agent-desktop keeps its refs, snapshots and recordings in a private state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`) and refuses any file there that another account can open. It never widens or repairs a folder it did not make: it fails closed. Codex's Windows sandbox grants its group (`<computer>\CodexSandboxUsers`) and its sandbox account access to folders its sessions touch, and folders inside inherit that, so every later command fails with this error, from Codex or not.
+
+Do not work around it with other tools (COM automation, scripts that type): tell the person and fix the folder.
+
+- Installed with `desktop-recorder-mcp` (the state is `~/.desktop-recorder-mcp/state`): run `npx desktop-recorder-mcp` again. It makes the state folder private, so grants on the folders above it no longer reach it.
+- Any other state folder: make it private (only the person, SYSTEM and Administrators, not inherited), then run the command again:
 
 ```powershell
-icacls "$env:USERPROFILE\.agent-desktop" /remove:g "$env:COMPUTERNAME\CodexSandboxUsers" /T /C /Q
+$me = (whoami /user /fo csv /nh).Split(',')[-1].Trim('"')
+$state = "$env:USERPROFILE\.agent-desktop"
+icacls $state /inheritance:r /grant:r "*${me}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F'
+icacls "$state\*" /reset /T /C /Q
 ```
-
-To avoid it, point `AGENT_DESKTOP_HOME` at a folder the sandbox does not touch.
 
 ## COM Apartment Error
 

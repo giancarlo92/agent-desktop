@@ -58,6 +58,23 @@ test('install sets up each chosen agent and keeps what was there', () => {
   assert.ok(lines.every((line) => !line.includes('not set up')), lines.join('\n'));
 });
 
+test('the state folder opens only to the person, SYSTEM and Administrators, whatever its parent grants', { skip: process.platform !== 'win32' }, () => {
+  const { execFileSync } = require('child_process');
+  const { home, options } = fakeHome();
+  const where = layout(home);
+  // What the Codex sandbox does to ~/.desktop-recorder-mcp: a group of its own, inherited by what is inside.
+  fs.mkdirSync(path.join(where.state, 'snapshots'), { recursive: true });
+  fs.writeFileSync(path.join(where.state, 'snapshots', 'old'), 'x');
+  execFileSync('icacls', [where.root, '/grant', '*S-1-5-32-545:(OI)(CI)(M)'], { stdio: 'ignore' });
+  install(['claude-code'], options);
+  for (const target of [where.state, path.join(where.state, 'snapshots', 'old')]) {
+    const acl = execFileSync('icacls', [target], { encoding: 'utf8' });
+    assert.ok(!/S-1-5-32-545|BUILTIN\\Users|BUILTIN\\Usuarios/i.test(acl), acl);
+  }
+  const own = execFileSync('icacls', [where.state], { encoding: 'utf8' });
+  assert.ok(!own.includes('(I)'), `the state folder must not inherit: ${own}`);
+});
+
 test('installing twice leaves one server, and uninstall removes only ours', () => {
   const { home, options } = fakeHome();
   install(['claude-code', 'codex'], options);
