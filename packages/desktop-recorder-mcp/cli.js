@@ -45,7 +45,9 @@ async function main() {
   const options = parse(process.argv.slice(2));
   if (options.command === 'help') return console.log(HELP);
   if (process.platform !== 'win32' && !options.home) {
-    throw new Error('desktop-recorder-mcp runs on Windows (record and its video are Windows only)');
+    console.log('desktop-recorder-mcp runs on Windows for now. macOS and Linux are coming soon.');
+    process.exitCode = 1;
+    return;
   }
   const home = options.home || os.homedir();
   const run = { home, env: process.env, dryRun: options.dryRun, useCli: !options.home, removeProgram: options.removeProgram };

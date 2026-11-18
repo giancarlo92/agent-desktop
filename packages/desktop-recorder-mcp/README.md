@@ -36,7 +36,9 @@ npx desktop-recorder-mcp --dry-run                  # say what would change
 npx desktop-recorder-mcp uninstall                  # remove it from the agents you pick
 ```
 
-The program goes in `%USERPROFILE%\.desktop-recorder-mcp\bin` and its private state (refs, recordings) in `%USERPROFILE%\.desktop-recorder-mcp\state`. Every configuration file it changes keeps a backup next to it (`.bak-desktop-recorder-mcp`). Windows only.
+The program goes in `%USERPROFILE%\.desktop-recorder-mcp\bin` and its private state (refs, recordings) in `%USERPROFILE%\.desktop-recorder-mcp\state`. Every configuration file it changes keeps a backup next to it (`.bak-desktop-recorder-mcp`).
+
+**Windows for now. macOS and Linux are coming soon.**
 
 ## Responsible use
 
@@ -52,4 +54,4 @@ Record only your own work, or with the consent of the people whose screen or dat
 
 ## What this is
 
-A fork of [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) (Apache-2.0), not the official package. It adds `record` (a person's own actions to JSON Lines, with an MP4 video, `record start`/`stop`/`status` in the background and an on-screen indicator), `secret` (passwords asked for once and kept in the system's secret store), and the guides `recording-to-script` and `script-repair`. It works only in the background: it never uses your mouse or keyboard and never brings a window to the front, so you can keep working while an agent or a script runs (commands that would need that are refused). Windows only for now. For the official tool, use `npm install -g agent-desktop`.
+A fork of [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) (Apache-2.0), not the official package. It adds `record` (a person's own actions to JSON Lines, with an MP4 video, `record start`/`stop`/`status` in the background and an on-screen indicator), `secret` (passwords asked for once and kept in the system's secret store), and the guides `recording-to-script` and `script-repair`. It works only in the background: it never uses your mouse or keyboard and never brings a window to the front, so you can keep working while an agent or a script runs (commands that would need that are refused). Windows for now; macOS and Linux are coming soon. For the official tool, use `npm install -g agent-desktop`.
