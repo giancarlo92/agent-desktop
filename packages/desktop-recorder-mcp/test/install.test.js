@@ -144,3 +144,16 @@ test('the agents CLIs get every argument intact, through npm .cmd scripts, witho
     ['codex', 'mcp', 'add', SERVER, '--env', `AGENT_DESKTOP_HOME=${where.state}`, '--', where.exe, 'mcp']);
   assert.ok(!/DEP0190|DeprecationWarning/.test(stderr || ''), stderr);
 });
+
+test('Claude Desktop is set up where recent versions read it (Claude-Data), else where older ones did', () => {
+  const { agents } = require('../lib/agents');
+  const { home, env } = fakeHome();
+  const desktop = () => agents(home, env).find((a) => a.id === 'claude-desktop');
+  const old = path.join(env.APPDATA, 'Claude');
+  fs.mkdirSync(old, { recursive: true });
+  assert.strictEqual(desktop().mcp.file, path.join(old, 'claude_desktop_config.json'));
+  const current = path.join(env.LOCALAPPDATA, 'Claude-Data', 'claude_pzs8sxrjxfjjc');
+  fs.mkdirSync(current, { recursive: true });
+  assert.strictEqual(desktop().mcp.file, path.join(current, 'claude_desktop_config.json'));
+  assert.ok(desktop().detect());
+});

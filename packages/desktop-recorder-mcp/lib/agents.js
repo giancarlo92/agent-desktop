@@ -13,8 +13,23 @@ function onPath(command, env) {
   return dirs.some((dir) => exts.some((ext) => fs.existsSync(path.join(dir, command + ext))));
 }
 
+/**
+ * Where Claude Desktop reads its MCP servers. Recent versions keep their data in
+ * %LOCALAPPDATA%\Claude-Data\<package folder> and leave a ".user-data-left" marker where it used to be;
+ * older ones use the packaged app's LocalCache\Roaming\Claude, or %APPDATA%\Claude.
+ */
 function claudeDesktopConfig(home, env) {
   const local = env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+  const data = path.join(local, 'Claude-Data');
+  try {
+    const found = fs.readdirSync(data, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && /^claude_/i.test(entry.name))
+      .map((entry) => path.join(data, entry.name))
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    if (found.length) return path.join(found[0], 'claude_desktop_config.json');
+  } catch (_) {
+    /* an older version */
+  }
   const packages = path.join(local, 'Packages');
   let packaged = null;
   try {
