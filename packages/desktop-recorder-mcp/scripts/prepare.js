@@ -28,7 +28,7 @@ function copyDir(from, to) {
     else fs.copyFileSync(a, b);
   }
 }
-for (const skill of ['agent-desktop', 'agent-desktop-windows']) {
+for (const skill of require('../lib/install').SKILLS) {
   fs.rmSync(path.join(pkg, 'skills', skill), { recursive: true, force: true });
   copyDir(path.join(repo, 'skills', skill), path.join(pkg, 'skills', skill));
 }

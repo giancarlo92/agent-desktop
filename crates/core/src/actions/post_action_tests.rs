@@ -365,3 +365,26 @@ fn clear_that_leaves_a_newline_is_not_verified() {
     assert_eq!(error.code, ErrorCode::ActionFailed);
     assert_eq!(error.disposition, DeliverySemantics::delivered_unverified());
 }
+
+#[test]
+fn a_value_the_page_read_back_is_verified_even_when_accessibility_shows_its_parts() {
+    let proven = |verified: Option<bool>| {
+        let step = ActionStep::succeeded("DevTools.setValue")
+            .with_mechanism(crate::StepMechanism::SemanticApi);
+        let step = match verified {
+            Some(v) => step.with_verified(v),
+            None => step,
+        };
+        let mut adapter = adapter(element(Some(""), &[]), element(Some(""), &[]));
+        adapter.execution =
+            Ok(ActionResult::delivered_unverified("set_value").with_steps(vec![step]));
+        execute(&adapter, Action::SetValue("1990-05-14".into()))
+    };
+    let result = proven(Some(true)).unwrap();
+    assert_eq!(result.details.unwrap()["verification_scope"], "page_value");
+    assert_eq!(
+        proven(Some(false)).unwrap_err().code,
+        ErrorCode::ActionFailed
+    );
+    assert_eq!(proven(None).unwrap_err().code, ErrorCode::ActionFailed);
+}

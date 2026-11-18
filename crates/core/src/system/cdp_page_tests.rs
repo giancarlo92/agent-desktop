@@ -56,3 +56,18 @@ fn nothing_matches_without_an_address_or_a_title_or_a_free_endpoint() {
         .is_empty()
     );
 }
+
+#[test]
+fn the_page_answer_says_whether_it_ran_fell_back_or_had_no_such_option() {
+    assert_eq!(outcome(&json!(true)), Outcome::Done { verified: true });
+    assert_eq!(outcome(&json!(false)), Outcome::Done { verified: false });
+    assert_eq!(outcome(&json!("other")), Outcome::NotFound);
+    assert_eq!(
+        outcome(&json!({ "options": ["Choose a country…", "Spain", "Peru"] })),
+        Outcome::NoSuchOption(vec![
+            "Choose a country…".into(),
+            "Spain".into(),
+            "Peru".into()
+        ])
+    );
+}

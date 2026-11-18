@@ -99,6 +99,18 @@ pub fn execute_verified_action(
         expected_text.as_deref(),
         &observed,
     );
+    if verified == Some(false) && value_proven_by_page(&action, &result) {
+        // A web page's own field read back the value (DevTools), while its accessibility value
+        // shows something else: a date or time field exposes its parts, not the whole value.
+        result.post_state = Some(observed.state);
+        result = result.with_verified_delivery();
+        let details = result.details.get_or_insert_with(|| serde_json::json!({}));
+        if let Some(details) = details.as_object_mut() {
+            details.insert("verification_scope".into(), "page_value".into());
+            details.insert("application_commit".into(), "not_verified".into());
+        }
+        return Ok(result);
+    }
     let physical_text_mismatch = verified == Some(false) && typed_by_keys(&action, &result);
     if verified.is_none() || physical_text_mismatch {
         let reason = if physical_text_mismatch {
@@ -145,6 +157,17 @@ fn typed_by_keys(action: &Action, result: &ActionResult) -> bool {
         && result.steps.iter().any(|step| {
             matches!(&step.outcome, crate::ActionStepOutcome::Succeeded)
                 && step.mechanism() == Some(crate::StepMechanism::PhysicalSynthetic)
+        })
+}
+
+/// A value write whose own mechanism read the value back from the application (a web page's
+/// field through DevTools), which is stronger evidence than the accessibility value.
+fn value_proven_by_page(action: &Action, result: &ActionResult) -> bool {
+    action.writes_element_value()
+        && result.steps.iter().any(|step| {
+            matches!(&step.outcome, crate::ActionStepOutcome::Succeeded)
+                && step.mechanism() == Some(crate::StepMechanism::SemanticApi)
+                && step.verified() == Some(true)
         })
 }
 

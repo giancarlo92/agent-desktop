@@ -27,7 +27,9 @@ false with error; a call rejected before the command runs returns plain text. de
 is the exception: its text is the guest command's own stdout, empty included, and isError follows \
 the guest's exit status. Read \
 desktop_skills_get with name \"desktop\" first for the observe-act loop, and with name \
-\"platform\" for what differs on this OS. The skills use CLI syntax: `agent-desktop snapshot \
+\"platform\" for what differs on this OS. To record a person's task, turn a recording into a \
+script that repeats it, or repair such a script, read desktop_skills_get with name \"recording\", \
+\"recording-to-script\" or \"script-repair\". The skills use CLI syntax: `agent-desktop snapshot \
 --app Finder` is desktop_snapshot with {\"app\": \"Finder\"}, and the input schema replaces \
 --help. Global flags (--session, --agent-id, --wait-for, --trace) are fixed \
 by how this server was started and cannot be passed per call; desktop_sandbox_exec gets none of \

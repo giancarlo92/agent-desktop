@@ -272,3 +272,41 @@ fn first_time_setup_section(document: &str) -> String {
         .unwrap_or(rest.len());
     rest[..end].to_owned()
 }
+
+#[test]
+fn recording_and_scripts_have_skills_of_their_own() {
+    for (alias, canonical, marker) in [
+        (
+            "recording",
+            "desktop-recording",
+            "# Recording a person's task",
+        ),
+        (
+            "recording-to-script",
+            "recording-to-script",
+            "## 5. The rules every script keeps",
+        ),
+        ("repair", "script-repair", "# Repairing a script"),
+    ] {
+        let body = get(GetArgs {
+            name: alias.into(),
+            full: false,
+            reference: None,
+        })
+        .expect(alias);
+        assert_eq!(body["skill"], canonical);
+        assert!(body["content"].as_str().expect("string").contains(marker));
+    }
+    let library = get(GetArgs {
+        name: "recording-to-script".into(),
+        full: false,
+        reference: Some("desktop-script.mjs".into()),
+    })
+    .expect("library");
+    assert!(
+        library["content"]
+            .as_str()
+            .expect("string")
+            .contains("export async function task")
+    );
+}

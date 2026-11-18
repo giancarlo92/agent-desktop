@@ -6,7 +6,14 @@ One command to give your AI agents a desktop they can see, use and **record**: C
 npx desktop-recorder-mcp
 ```
 
-It lists the agents on your computer; tick the ones you want and press Enter. For each one it adds the MCP server and, where the agent reads skills from a folder (Claude Code, Codex, Windsurf), the guides on how to use it, record a task and turn a recording into a script. The other agents read the same guides through the MCP server.
+It lists the agents on your computer; tick the ones you want and press Enter. For each one it adds the MCP server and, where the agent reads skills from a folder (Claude Code, Codex, Windsurf), these skills. The other agents read the same skills through the MCP server.
+
+| Skill | What it teaches your agent |
+|---|---|
+| `agent-desktop`, `agent-desktop-windows` | Seeing and using desktop apps and web pages, in the background |
+| `desktop-recording` | Recording a task you do in a window, an app or a screen, with or without video |
+| `recording-to-script` | Turning a recording into a script that repeats the task without AI, with the values that change as options and passwords filled by name. JavaScript by default; ask for Python, Go or any other language and it writes it in that one |
+| `script-repair` | Fixing that script when the app or the page changed: it finds the step that no longer matches and changes only that one |
 
 Some agents come in two forms that share one setup, and some do not:
 
@@ -23,6 +30,9 @@ Then open a new conversation and ask, in your own words:
 - "What displays do I have?"
 - "Record the Excel window with video and save it in D:\Videos\task.mp4", then "I'm done".
 - "Turn that recording into a script; the customer and the amount change every time."
+- Later, when the script stops with "Step 4 (...) failed": "The script failed at step 4, repair it."
+
+A script runs on its own, without AI and in the background, while you keep working: `node invoice.mjs --customer "Lucia" --amount 150` (`--help` lists what it asks for).
 
 While it records, a small red indicator at the bottom of the screen shows the time and a Stop button.
 
@@ -64,4 +74,4 @@ Record only your own work, or with the consent of the people whose screen or dat
 
 ## What this is
 
-A fork of [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) (Apache-2.0), not the official package. It adds `record` (a person's own actions to JSON Lines, with an MP4 video, `record start`/`stop`/`status` in the background and an on-screen indicator), `secret` (passwords asked for once and kept in the system's secret store), and the guides `recording-to-script` and `script-repair`. It works only in the background: it never uses your mouse or keyboard and never brings a window to the front, so you can keep working while an agent or a script runs (commands that would need that are refused). Windows for now; macOS and Linux are coming soon. For the official tool, use `npm install -g agent-desktop`.
+A fork of [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) (Apache-2.0), not the official package. It adds `record` (a person's own actions to JSON Lines, with an MP4 video, `record start`/`stop`/`status` in the background and an on-screen indicator), `secret` (passwords asked for once and kept in the system's secret store), and the skills `desktop-recording`, `recording-to-script` and `script-repair`. It works only in the background: it never uses your mouse or keyboard and never brings a window to the front, so you can keep working while an agent or a script runs (commands that would need that are refused). Windows for now; macOS and Linux are coming soon. For the official tool, use `npm install -g agent-desktop`.

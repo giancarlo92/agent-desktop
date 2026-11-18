@@ -11,10 +11,12 @@ const SKILL_DESKTOP_REF_SYSTEM: &str =
     include_str!("../../../../skills/agent-desktop/references/commands-system.md");
 const SKILL_DESKTOP_REF_WORKFLOWS: &str =
     include_str!("../../../../skills/agent-desktop/references/workflows.md");
-const SKILL_DESKTOP_REF_RECORDING_TO_SCRIPT: &str =
-    include_str!("../../../../skills/agent-desktop/references/recording-to-script.md");
-const SKILL_DESKTOP_REF_SCRIPT_REPAIR: &str =
-    include_str!("../../../../skills/agent-desktop/references/script-repair.md");
+
+const SKILL_RECORDING_MAIN: &str = include_str!("../../../../skills/desktop-recording/SKILL.md");
+const SKILL_TO_SCRIPT_MAIN: &str = include_str!("../../../../skills/recording-to-script/SKILL.md");
+const SKILL_TO_SCRIPT_LIBRARY: &str =
+    include_str!("../../../../skills/recording-to-script/scripts/desktop-script.mjs");
+const SKILL_REPAIR_MAIN: &str = include_str!("../../../../skills/script-repair/SKILL.md");
 
 const SKILL_MACOS_MAIN: &str = include_str!("../../../../skills/agent-desktop-macos/SKILL.md");
 const SKILL_MACOS_REF_TROUBLESHOOTING: &str =
@@ -101,15 +103,12 @@ const SKILL_DESKTOP_REFS: &[SkillRef] = &[
         rel_path: "references/workflows.md",
         body: SKILL_DESKTOP_REF_WORKFLOWS,
     },
-    SkillRef {
-        rel_path: "references/recording-to-script.md",
-        body: SKILL_DESKTOP_REF_RECORDING_TO_SCRIPT,
-    },
-    SkillRef {
-        rel_path: "references/script-repair.md",
-        body: SKILL_DESKTOP_REF_SCRIPT_REPAIR,
-    },
 ];
+
+const SKILL_TO_SCRIPT_REFS: &[SkillRef] = &[SkillRef {
+    rel_path: "scripts/desktop-script.mjs",
+    body: SKILL_TO_SCRIPT_LIBRARY,
+}];
 
 const SKILL_MACOS_REFS: &[SkillRef] = &[SkillRef {
     rel_path: "references/troubleshooting.md",
@@ -189,6 +188,30 @@ const SKILLS: &[Skill] = &[
         platform: None,
         main: SKILL_DESKTOP_MAIN,
         refs: SKILL_DESKTOP_REFS,
+    },
+    Skill {
+        canonical: "desktop-recording",
+        aliases: &["recording", "record", "desktop-recording"],
+        summary: "Recording a person's task: what to record (a window, app or screen), with or without video, starting, stopping, and what each recorded action holds.",
+        platform: None,
+        main: SKILL_RECORDING_MAIN,
+        refs: &[],
+    },
+    Skill {
+        canonical: "recording-to-script",
+        aliases: &["recording-to-script", "script", "to-script"],
+        summary: "Turning a recording into a script that repeats the task without AI, in the background: the rules any script keeps, JavaScript by default with desktop-script.mjs, or the language the person asks for.",
+        platform: None,
+        main: SKILL_TO_SCRIPT_MAIN,
+        refs: SKILL_TO_SCRIPT_REFS,
+    },
+    Skill {
+        canonical: "script-repair",
+        aliases: &["script-repair", "repair"],
+        summary: "Repairing a script made from a recording after the app or page changed: finding the first wrong step, changing only it, running it all again.",
+        platform: None,
+        main: SKILL_REPAIR_MAIN,
+        refs: &[],
     },
     Skill {
         canonical: "agent-desktop-macos",

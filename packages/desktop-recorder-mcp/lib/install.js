@@ -12,7 +12,7 @@ const { agents, onPath } = require('./agents');
 
 const SERVER = 'desktop-recorder';
 const PACKAGE = path.join(__dirname, '..');
-const SKILLS = ['agent-desktop', 'agent-desktop-windows'];
+const SKILLS = ['agent-desktop', 'agent-desktop-windows', 'desktop-recording', 'recording-to-script', 'script-repair'];
 
 /** Where everything goes for one home folder. */
 function layout(home) {
@@ -209,4 +209,4 @@ function status(options) {
   return lines;
 }
 
-module.exports = { commandLine, install, uninstall, status, layout, server, SERVER };
+module.exports = { commandLine, install, uninstall, status, layout, server, SERVER, SKILLS };

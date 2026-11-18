@@ -47,7 +47,12 @@ test('install sets up each chosen agent and keeps what was there', () => {
   assert.ok(JSON.parse(read(path.join(home, '.cursor', 'mcp.json'))).mcpServers[SERVER]);
 
   assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'agent-desktop', 'SKILL.md')), 'Claude Code gets the skills');
-  assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'agent-desktop', 'references', 'recording-to-script.md')));
+  for (const skill of ['desktop-recording', 'recording-to-script', 'script-repair']) {
+    assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', skill, 'SKILL.md')), `Claude Code gets ${skill}`);
+    assert.ok(fs.existsSync(path.join(home, '.codex', 'skills', skill, 'SKILL.md')), `Codex gets ${skill}`);
+  }
+  assert.ok(fs.existsSync(path.join(home, '.claude', 'skills', 'recording-to-script', 'scripts', 'desktop-script.mjs')),
+    'the script helpers come with the skill');
   assert.ok(fs.existsSync(path.join(home, '.codex', 'skills', 'agent-desktop-windows', 'SKILL.md')), 'Codex gets the skills');
   assert.equal(lines.length, 4);
   assert.ok(lines.every((line) => !line.includes('not set up')), lines.join('\n'));

@@ -1,6 +1,6 @@
 {
   "name": "desktop-recorder-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Install agent-desktop with record, saved passwords and a background-only mode (never your mouse, keyboard or focus) into your AI agents: Claude Code, Codex, Gemini CLI, Cursor, VS Code, Windsurf and Claude Desktop. A fork of vercel-labs/agent-desktop. Windows now; macOS and Linux coming soon.",
   "license": "Apache-2.0",
   "repository": {

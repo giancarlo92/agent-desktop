@@ -31,6 +31,8 @@ use crate::tree::element::UIAElement;
 
 const CLICK_LABEL: &str = "DevTools.click";
 const SET_VALUE_LABEL: &str = "DevTools.setValue";
+const SELECT_LABEL: &str = "DevTools.select";
+const CHECK_LABEL: &str = "DevTools.check";
 const CHROMIUM_FRAMEWORK: &str = "Chrome";
 const MAX_ANCESTORS: usize = 96;
 const MAX_PORTS: usize = 8;
@@ -48,6 +50,9 @@ pub(crate) fn devtools_steps(
         Action::Click => (PageAction::Click, CLICK_LABEL),
         Action::SetValue(value) => (PageAction::SetValue(value), SET_VALUE_LABEL),
         Action::Clear => (PageAction::SetValue(""), SET_VALUE_LABEL),
+        Action::Select(value) => (PageAction::Select(value), SELECT_LABEL),
+        Action::Check => (PageAction::Check(true), CHECK_LABEL),
+        Action::Uncheck => (PageAction::Check(false), CHECK_LABEL),
         _ => return Ok(None),
     };
     let framework = element.0.get_framework_id().ok();
@@ -76,7 +81,7 @@ pub(crate) fn devtools_steps(
         &NodeQuery {
             name: &name,
             dom_id: dom_id.as_deref(),
-            editable: !matches!(page_action, PageAction::Click),
+            editable: matches!(page_action, PageAction::SetValue(_) | PageAction::Select(_)),
         },
         &page_action,
         timeout,
@@ -86,10 +91,17 @@ pub(crate) fn devtools_steps(
             tracing::debug!("devtools: no single matching element on the page");
             Ok(None)
         }
+        Ok(Outcome::NoSuchOption(options)) => Err(AdapterError::new(
+            ErrorCode::ElementNotFound,
+            "The list has no option with that text or value",
+        )
+        .with_details(serde_json::json!({ "kind": "no_such_option", "options": options }))
+        .with_suggestion("Choose one of details.options")
+        .with_disposition(DeliverySemantics::not_delivered())),
         Ok(Outcome::Done { verified: false }) if !matches!(page_action, PageAction::Click) => {
             Err(AdapterError::new(
                 ErrorCode::ActionFailed,
-                "The field did not keep the value written through DevTools",
+                "The page did not keep the change made through DevTools",
             )
             .with_disposition(DeliverySemantics::delivered_unverified()))
         }

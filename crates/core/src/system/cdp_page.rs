@@ -31,6 +31,10 @@ pub struct NodeQuery<'a> {
 pub enum PageAction<'a> {
     Click,
     SetValue(&'a str),
+    /// Chooses the option of a list (`<select>`) whose text or value is this.
+    Select(&'a str),
+    /// Checks (`true`) or unchecks a checkbox, radio button or switch.
+    Check(bool),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -39,6 +43,9 @@ pub enum Outcome {
     NotFound,
     /// The action ran; `verified` is whether the page confirms its effect.
     Done { verified: bool },
+    /// The list has no such option, so nothing was chosen. These are the
+    /// texts of the options it has (at most 50).
+    NoSuchOption(Vec<String>),
 }
 
 /// The action was sent but the page did not confirm it: it may have run.
@@ -51,6 +58,23 @@ const IS_ELEMENT: &str = "function(){return this.nodeType===1&&this.tagName!=='L
 const IS_EDITABLE: &str = "function(){return this.nodeType===1&&(this.isContentEditable||\
     ((this.tagName==='INPUT'||this.tagName==='TEXTAREA'||this.tagName==='SELECT')&&!this.disabled&&!this.readOnly))}";
 const CLICK: &str = "function(){this.click();return true}";
+/// Chooses an option by its text, then by its value, then either ignoring case.
+/// Anything other than a `<select>` answers `"other"`, and the caller falls back.
+const SELECT: &str = "function(v){if(!(this instanceof HTMLSelectElement))return 'other';\
+    var o=Array.from(this.options),l=v.trim().toLowerCase();\
+    var m=o.find(function(x){return x.text.trim()===v.trim()})||o.find(function(x){return x.value===v})||\
+    o.find(function(x){return x.text.trim().toLowerCase()===l||x.value.toLowerCase()===l});\
+    if(!m)return {options:o.slice(0,50).map(function(x){return x.text.trim()})};\
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(this,m.value);\
+    this.dispatchEvent(new Event('input',{bubbles:true}));\
+    this.dispatchEvent(new Event('change',{bubbles:true}));return this.value===m.value}";
+/// Clicks a checkbox, radio button or switch only when it is not already as
+/// wanted. Anything else answers `"other"`, and the caller falls back.
+const CHECK: &str = "function(w){var r=this.getAttribute('role');\
+    var box=this.type==='checkbox'||this.type==='radio';\
+    if(!box&&r!=='checkbox'&&r!=='switch'&&r!=='radio')return 'other';\
+    var c=function(e){return box?e.checked:e.getAttribute('aria-checked')==='true'};\
+    if(c(this)!==w)this.click();return c(this)===w}";
 /// Writes through the element's native setter and fires the events a typed
 /// change fires, so a React or Vue form notices it.
 const SET_VALUE: &str = "function(v){if(this.isContentEditable){this.textContent=v;\
@@ -267,6 +291,8 @@ impl Session {
         let (function, arguments) = match action {
             PageAction::Click => (CLICK, json!([])),
             PageAction::SetValue(value) => (SET_VALUE, json!([{ "value": value }])),
+            PageAction::Select(value) => (SELECT, json!([{ "value": value }])),
+            PageAction::Check(wanted) => (CHECK, json!([{ "value": wanted }])),
         };
         let result = self
             .call(
@@ -283,9 +309,27 @@ impl Session {
         if result.get("exceptionDetails").is_some() {
             return Err(Unconfirmed("The page raised an error while the action ran"));
         }
-        Ok(Outcome::Done {
-            verified: result["result"]["value"] == true,
-        })
+        Ok(outcome(&result["result"]["value"]))
+    }
+}
+
+/// What the page answered: `true` or `false` for an action that ran and
+/// whether its effect shows, `"other"` when the element is not the kind the
+/// action is for, or the options of a list that has none like the one asked.
+pub(crate) fn outcome(answer: &Value) -> Outcome {
+    if answer == "other" {
+        return Outcome::NotFound;
+    }
+    if let Some(options) = answer["options"].as_array() {
+        return Outcome::NoSuchOption(
+            options
+                .iter()
+                .filter_map(|o| o.as_str().map(str::to_owned))
+                .collect(),
+        );
+    }
+    Outcome::Done {
+        verified: answer == true,
     }
 }
 
