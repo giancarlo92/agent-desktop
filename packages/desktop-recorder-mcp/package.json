@@ -27,7 +27,8 @@
   },
   "scripts": {
     "prepare-vendor": "node scripts/prepare.js",
-    "test": "node --test test/install.test.js"
+    "test": "node --test test/install.test.js",
+    "release": "node scripts/release.js"
   },
   "keywords": [
     "agent-desktop",
