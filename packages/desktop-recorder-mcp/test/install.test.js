@@ -102,7 +102,7 @@ test('status says what is set up', () => {
   install(['claude-code'], options);
   const lines = status(options);
   assert.ok(lines.some((l) => /^Claude Code: found, MCP set up, skills installed/.test(l)), lines.join('\n'));
-  assert.ok(lines.some((l) => /^Codex \(ChatGPT\): found, MCP not set up/.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /^Codex \(the codex command and the Codex app\): found, MCP not set up/.test(l)), lines.join('\n'));
 });
 
 test('a command line quotes what needs it and refuses what the shell would still read', () => {

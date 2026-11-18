@@ -57,7 +57,7 @@ function agents(home, env) {
     },
     {
       id: 'codex',
-      name: 'Codex (ChatGPT)',
+      name: 'Codex (the codex command and the Codex app)',
       cli: 'codex',
       detect: () => fs.existsSync(path.join(home, '.codex')) || onPath('codex', env),
       mcp: { kind: 'toml', file: path.join(home, '.codex', 'config.toml') },

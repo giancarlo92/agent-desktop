@@ -8,6 +8,16 @@ npx desktop-recorder-mcp
 
 It lists the agents on your computer; tick the ones you want and press Enter. For each one it adds the MCP server and, where the agent reads skills from a folder (Claude Code, Codex, Windsurf), the guides on how to use it, record a task and turn a recording into a script. The other agents read the same guides through the MCP server.
 
+Some agents come in two forms that share one setup, and some do not:
+
+| You use | Tick | Then |
+|---|---|---|
+| Claude Code in a terminal, or the **Code** tab of the Claude app | Claude Code | Start a new session |
+| The **Chat** of the Claude app | Claude Desktop (a setup of its own) | Quit and reopen the app |
+| The `codex` command, or the **Codex** app | Codex (both read `~/.codex/config.toml`) | Restart the Codex app |
+
+The chat of the ChatGPT app cannot run a tool on your computer this way: it connects only to MCP servers on the internet.
+
 Then open a new conversation and ask, in your own words:
 
 - "What displays do I have?"
