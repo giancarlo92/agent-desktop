@@ -64,7 +64,8 @@ function makePrivate(dir) {
   const system32 = path.join(process.env.SystemRoot || process.env.windir || 'C:\\Windows', 'System32');
   const user = execFileSync(path.join(system32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true })
     .trim().split(',').pop().replace(/"/g, '');
-  if (!/^S-1-5-[\d-]+$/.test(user)) throw new Error(`could not read your account's id to protect ${dir}`);
+  // S-1-5-21-... for local, domain and Microsoft accounts; S-1-12-1-... for Microsoft Entra ID accounts.
+  if (!/^S-1-\d+(-\d+)+$/.test(user)) throw new Error(`could not read your account's id to protect ${dir}`);
   const icacls = (...args) => execFileSync(path.join(system32, 'icacls.exe'), args, { stdio: 'ignore', windowsHide: true });
   icacls(dir, '/inheritance:r', '/grant:r', `*${user}:(OI)(CI)F`, '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F');
   if (fs.readdirSync(dir).length) icacls(path.join(dir, '*'), '/reset', '/T', '/C', '/Q');
