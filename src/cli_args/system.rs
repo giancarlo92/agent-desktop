@@ -154,6 +154,35 @@ pub(crate) struct AppRefArgs {
 
 #[derive(Parser, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct MenuArgs {
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub scope: WindowScope,
+    #[arg(
+        required = true,
+        value_name = "ITEM",
+        help = "The menu path, one item per argument, such as: File Export (shortcut letters, keys and a trailing ... are ignored)"
+    )]
+    pub path: Vec<String>,
+}
+
+#[derive(Parser, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClickAtArgs {
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub scope: WindowScope,
+    #[arg(help = "Pixels from the left edge of the window's screenshot")]
+    pub x: i32,
+    #[arg(help = "Pixels from the top edge of the window's screenshot")]
+    pub y: i32,
+    #[arg(long, help = "Double-click instead of a single click")]
+    #[serde(default)]
+    pub double: bool,
+}
+
+#[derive(Parser, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ClipboardGetArgs {
     #[arg(
         long,

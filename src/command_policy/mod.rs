@@ -78,6 +78,8 @@ pub(crate) fn policy_for(cmd: &Commands) -> PermissionNeed {
         | Commands::Minimize(_)
         | Commands::Maximize(_)
         | Commands::Restore(_)
+        | Commands::Menu(_)
+        | Commands::ClickAt(_)
         | Commands::DismissNotification(_)
         | Commands::DismissAllNotifications(_)
         | Commands::NotificationAction(_) => Accessibility,
@@ -239,6 +241,8 @@ fn validate_args(cmd: &Commands) -> Result<(), AppError> {
         | Commands::Minimize(_)
         | Commands::Maximize(_)
         | Commands::Restore(_)
+        | Commands::Menu(_)
+        | Commands::ClickAt(_)
         | Commands::ListSurfaces(_)
         | Commands::ListNotifications(_)
         | Commands::DismissNotification(_)

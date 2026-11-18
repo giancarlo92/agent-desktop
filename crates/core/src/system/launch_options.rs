@@ -88,10 +88,14 @@ pub fn keep_working_while_covered(args: &mut Vec<String>) {
 }
 
 /// Whether the launch arguments give the program a profile directory of its
-/// own (`--user-data-dir`, as Chromium browsers take it): such an instance is
+/// own (`--user-data-dir`, as Chromium browsers take it, or `-data <folder>`,
+/// the workspace of an Eclipse-based app such as DBeaver): such an instance is
 /// separate from any other running instance of the same program.
 pub fn has_own_profile(args: &[String]) -> bool {
-    args.iter().any(|arg| arg.starts_with("--user-data-dir"))
+    args.iter().enumerate().any(|(index, arg)| {
+        arg.starts_with("--user-data-dir")
+            || (arg == "-data" && args.get(index + 1).is_some_and(|dir| !dir.starts_with('-')))
+    })
 }
 
 #[cfg(test)]

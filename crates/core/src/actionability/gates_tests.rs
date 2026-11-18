@@ -187,3 +187,21 @@ fn visible_without_bounds_agrees_with_the_visibility_gate_for_every_state() {
         }
     }
 }
+
+#[test]
+fn a_tab_reported_offscreen_with_real_bounds_passes_only_without_a_pointer() {
+    let mut shown = evidence(Some(true), Some(rect()));
+    shown.state.role = "tab".into();
+    assert_eq!(
+        visibility(&shown, false, true).status,
+        ActionabilityStatus::Pass
+    );
+    assert_eq!(
+        visibility(&shown, false, false).status,
+        ActionabilityStatus::Fail
+    );
+    assert_eq!(
+        visibility(&evidence(Some(true), None), false, true).status,
+        ActionabilityStatus::Fail
+    );
+}

@@ -11,7 +11,7 @@ symptom first.
 | Chromium/Electron app returns far fewer nodes than the UI shows | The first read came before the renderer's accessibility build settled | Run `snapshot --timeout-ms 30000`. The settle can take 10 to 25 s cold. See `chromium-and-electron.md` |
 | Node count frozen at a small number however long you wait | Other windows fully cover the target during the settle | Bring the target to the foreground or minimize the covering windows, then snapshot again |
 | WPF app: one node, `ClassName` like `HwndWrapper[...]`, zero children | A read before the automation peer existed bound the generic HWND provider permanently | Take a fresh snapshot. In-process retries never recover |
-| Custom-rendered UI or a game returns nothing meaningful | No accessibility exposure at all | Out of scope. Use screenshots for verification only |
+| Custom-rendered UI or a game returns nothing meaningful | No accessibility exposure at all | Read it with `screenshot`, and act through what the app offers besides its window: its automation interface, command line, files, database or API |
 
 ## PERM_DENIED with an E_ACCESSDENIED Detail
 
@@ -31,7 +31,7 @@ Fix: run your terminal elevated to the target's level. See
 
 agent-desktop keeps its refs, snapshots and recordings in a private state directory (`~/.agent-desktop`, or `AGENT_DESKTOP_HOME`) and refuses any file there that another account can open. It never widens or repairs a folder it did not make: it fails closed. Codex's Windows sandbox grants its group (`<computer>\CodexSandboxUsers`) and its sandbox account access to folders its sessions touch, and folders inside inherit that, so every later command fails with this error, from Codex or not.
 
-Do not work around it with other tools (COM automation, scripts that type): tell the person and fix the folder.
+Fix the folder as below, and finish the task meanwhile by any other way you have (the app's own automation, its command line, its files).
 
 - Installed with `desktop-recorder-mcp` (the state is `~/.desktop-recorder-mcp/state`): run `npx desktop-recorder-mcp` again. It makes the state folder private, so grants on the folders above it no longer reach it.
 - Any other state folder: make it private (only the person, SYSTEM and Administrators, not inherited), then run the command again:

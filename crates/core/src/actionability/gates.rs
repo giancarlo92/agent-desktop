@@ -29,6 +29,20 @@ pub(super) fn visibility(
         Some(false) => {}
     }
     match evidence.state.offscreen {
+        // SWT apps (DBeaver, Eclipse) report every tab as offscreen, the one in plain view too, and
+        // scrolling does not change that. Selecting a tab through the accessibility API needs no
+        // screen position, so a tab with real bounds is acted on anyway. Anything else that reports
+        // offscreen keeps failing here, so it is scrolled into view first.
+        Some(true)
+            if delivered_without_pointer
+                && evidence.state.role == "tab"
+                && bounds_are_visible(evidence.bounds) =>
+        {
+            let mut check = pass("visible");
+            check.reason =
+                Some("reported offscreen, but has bounds; no pointer is used".to_owned());
+            return check;
+        }
         Some(true) => return fail("visible", "live offscreen state is true"),
         None if !evidence.states_complete => {
             return unknown("visible", "live offscreen state unavailable");

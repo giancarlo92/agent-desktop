@@ -13,10 +13,13 @@ pub(crate) mod focus;
 #[cfg(target_os = "windows")]
 pub(crate) mod focus_guard;
 pub(crate) mod input_envelope_parity;
+pub(crate) mod menu_command;
 pub(crate) mod mutation;
 pub(crate) mod physical_click;
 pub(crate) mod physical_keyboard;
 pub(crate) mod physical_target;
+pub(crate) mod point_click;
+pub(crate) mod posted_click;
 pub(crate) mod scroll;
 pub(crate) mod scroll_into_view;
 pub(crate) mod scroll_ladder;

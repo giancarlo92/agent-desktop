@@ -271,9 +271,9 @@ Every command prints one envelope. `docs/json-output.md` holds the full contract
 
 ## Command surface
 
-64 commands spanning App/Window, Observation, Interaction, Scroll, Keyboard, Mouse, Notifications, Clipboard, Wait,
+66 commands spanning App/Window, Observation, Interaction, Scroll, Keyboard, Mouse, Notifications, Clipboard, Wait,
 Recording (`record`), System (including `session`, `trace`, `skills`), Sandboxes (`sandbox`) and Batch.
-60 of the 64 command names are operational; the four held-input names (`key-down`, `key-up`, `mouse-down`,
+62 of the 66 command names are operational; the four held-input names (`key-down`, `key-up`, `mouse-down`,
 `mouse-up`) fail closed, and `record` and `stroke` are implemented on Windows only, so macOS and Linux run 58.
 Windows and Linux expose the same command names. Each platform's limits are in its skill
 (`skills/agent-desktop-macos/`, `skills/agent-desktop-windows/`, `skills/agent-desktop-linux/`).

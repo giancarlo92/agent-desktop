@@ -1,12 +1,13 @@
 use agent_desktop_core::{
     AppError, PlatformAdapter,
     commands::{
-        close_app as close_app_command, focus_window as focus_window_command, helpers,
-        launch as launch_command, list_apps as list_apps_command,
-        list_surfaces as list_surfaces_command, list_windows as list_windows_command,
-        maximize as maximize_command, minimize as minimize_command,
-        move_window as move_window_command, open_system_surface as open_system_surface_command,
-        resize_window as resize_window_command, restore as restore_command,
+        click_at as click_at_command, close_app as close_app_command,
+        focus_window as focus_window_command, helpers, launch as launch_command,
+        list_apps as list_apps_command, list_surfaces as list_surfaces_command,
+        list_windows as list_windows_command, maximize as maximize_command, menu as menu_command,
+        minimize as minimize_command, move_window as move_window_command,
+        open_system_surface as open_system_surface_command, resize_window as resize_window_command,
+        restore as restore_command,
     },
 };
 use serde_json::Value;
@@ -14,8 +15,8 @@ use serde_json::Value;
 use crate::cli_args::{
     ListSurfacesArgs,
     system::{
-        AppRefArgs, CloseAppArgs, FocusWindowArgs, LaunchArgs, ListAppsArgs, ListWindowsArgs,
-        MoveWindowCliArgs, OpenSystemSurfaceArgs, ResizeWindowCliArgs,
+        AppRefArgs, ClickAtArgs, CloseAppArgs, FocusWindowArgs, LaunchArgs, ListAppsArgs,
+        ListWindowsArgs, MenuArgs, MoveWindowCliArgs, OpenSystemSurfaceArgs, ResizeWindowCliArgs,
     },
 };
 use crate::dispatch::parse::build_launch_options;
@@ -152,6 +153,33 @@ pub(super) fn maximize(args: AppRefArgs, adapter: &dyn PlatformAdapter) -> Resul
         helpers::AppArgs {
             app: args.scope.app,
             window_id: args.scope.window_id,
+        },
+        adapter,
+    )
+}
+
+pub(super) fn click_at(
+    args: ClickAtArgs,
+    adapter: &dyn PlatformAdapter,
+) -> Result<Value, AppError> {
+    click_at_command::execute(
+        click_at_command::ClickAtArgs {
+            app: args.scope.app,
+            window_id: args.scope.window_id,
+            x: args.x,
+            y: args.y,
+            double: args.double,
+        },
+        adapter,
+    )
+}
+
+pub(super) fn menu(args: MenuArgs, adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
+    menu_command::execute(
+        menu_command::MenuArgs {
+            app: args.scope.app,
+            window_id: args.scope.window_id,
+            path: args.path,
         },
         adapter,
     )

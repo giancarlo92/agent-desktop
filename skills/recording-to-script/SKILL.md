@@ -51,7 +51,7 @@ Leave out what a replay must not repeat:
 - Clicks on the taskbar or the Start menu (`explorer.exe`): the script opens the app itself.
 - Minimize, maximize and restore.
 
-Keep everything that changes the result: every value, every option, every file opened or saved, every confirmation. If a part cannot be replayed, tell the person which and why; never drop it silently. What the person says about the task (a step they forgot, a value that changes, something to ignore) wins over the recording.
+Keep everything that changes the result: every value, every option, every file opened or saved, every confirmation. A part that has no direct background command is still done, another way (section 6); never drop it. What the person says about the task (a step they forgot, a value that changes, something to ignore) wins over the recording.
 
 ## 3. Decide the parameters
 
@@ -74,7 +74,7 @@ These were tested on real forms, a password prompt and a desktop app, with a per
 3. **Open, never attach to, what the person is using.** A desktop app: `launch <program>` (it never takes the focus), then wait for its window by title. A web page: `launch <browser> --no-attach --cdp --arg=--user-data-dir=<a folder of the script's own> --arg=--no-first-run --arg=<url>`. The DevTools endpoint lets clicks, values, list choices and checkboxes on the page happen without the browser ever coming forward, and the separate profile leaves the person's own browser alone. Find its window by the `pid` that `launch` returned.
 4. **Find each element right before acting on it**, inside the task's window (`find --window-id <id> --first ...`). Refs belong to one snapshot and go stale. Prefer, in this order: `--native-id`, then `--role` with `--name` (`--exact` for short names such as "AI"), then `--name` with the `help_text` or `label`, then an ancestor when `match_count` was above 1. Retry `find` for a while (15 s) instead of sleeping a fixed time: pages and apps answer at different speeds.
 5. **A text that is only read has no ref.** A message, a total or a status is read from the `find` match itself (`match.value`, else `match.name`), not with `get`.
-6. **Act only with background commands** (table in section 6): `click`, `set-value`, `clear`, `select`, `check`, `uncheck`, `secret fill`. Never `press`, `type`, `focus-window`, `hover`, `drag` or mouse commands: this build refuses them.
+6. **Act with background commands** (table in section 6): `click`, `set-value`, `clear`, `select`, `check`, `uncheck`, `secret fill`. This build refuses `press`, `type`, `focus-window`, `hover`, `drag` and mouse commands, because they would use the person's keyboard and mouse. When a step has no background command, the script still does it another way: the app's own automation (COM for Excel, Word or Outlook), its command line, its files or database, or an API.
 7. **Check every step.** `set-value`, `select`, `check` and `secret fill` report `data.disposition.delivery`. `delivered_verified` means agent-desktop read the result back (for a web field, from the page itself: a date field shows its parts, not the value, to accessibility). Otherwise read it with `get <ref> --property value` or `is <ref> --property checked`. After an action that opens or changes something, wait for what the next step needs (`wait --text <text> --window-id <id>`, or a retried `find`).
 8. **Retry an action only when `disposition.retry` is `safe`.** Any other answer means it may have happened: read the screen and decide, never repeat it blindly.
 9. **Ask before what cannot be undone** (send, post, delete, buy, pay), unless the person asked for it to run on its own (a `--yes` option). Never retry those steps, and never try two ways of doing one.
@@ -90,12 +90,12 @@ These were tested on real forms, a password prompt and a desktop app, with a per
 | `click` with `state_after.checked` | `check` or `uncheck` (they do nothing when it is already so) |
 | `type` into a field | `set-value` with the value (or the parameter), then check it |
 | `type` with `secure: true` | `secret fill` the field with the secret's name |
-| `type` into a grid cell or canvas editor | select the cell (`select` or `click`), then `set-value` the cell or its editor; a grid that only accepts typing cannot run in the background: say so |
+| `type` into a grid cell or canvas editor | select the cell (`select` or `click`), then `set-value` the cell or its editor; a grid that only accepts typing is written through the app's automation (COM for Excel) or its file |
 | `select` | `select` the list with the option's text (or value) |
-| `press` (`return`, `ctrl+s`, `tab`) | `click` the button that does the same (Save, OK, Send, Submit); a key with no button cannot run in the background: say so |
+| `press` (`return`, `ctrl+s`, `tab`) | `click` the button or menu item that does the same (Save, OK, Send, Submit, Execute); with none, do it through the app's automation or command line |
 | `scroll` | usually nothing: `find` reaches elements out of view; `scroll-to` if one must be visible |
 | `drag` that selected cells or text | select the same range with `select` |
-| `drag` on a canvas, or a click with no name at all | not available: it needs the mouse. Say so, or find the element's name in a fresh `snapshot` |
+| `drag` on a canvas, or a click with no name at all | find the element in a fresh `snapshot` (it often has a name or id there), or reach the same result through the app's automation, its files or a command |
 | copy (`ctrl+c`) with `clipboard` | read the source (`get`, or the `find` match) and `set-value` it where it goes |
 
 ## 7. JavaScript (the default)

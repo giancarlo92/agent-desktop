@@ -118,6 +118,8 @@ fn dispatch_command(
         Commands::Minimize(args) => app_window::minimize(args, adapter),
         Commands::Maximize(args) => app_window::maximize(args, adapter),
         Commands::Restore(args) => app_window::restore(args, adapter),
+        Commands::Menu(args) => app_window::menu(args, adapter),
+        Commands::ClickAt(args) => app_window::click_at(args, adapter),
         Commands::ListSurfaces(args) => app_window::list_surfaces(args, adapter),
         Commands::OpenSystemSurface(args) => {
             app_window::open_system_surface(args, adapter, context)

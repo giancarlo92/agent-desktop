@@ -233,6 +233,26 @@ impl ActionOps for WindowsAdapter {
     ) -> Result<(), AdapterError> {
         crate::actions::scroll_into_view::scroll_into_view_impl(handle, lease)
     }
+
+    fn invoke_menu(
+        &self,
+        window: &WindowInfo,
+        path: &[String],
+        lease: &InteractionLease,
+    ) -> Result<Vec<String>, AdapterError> {
+        crate::actions::menu_command::invoke(window, path, lease.deadline())
+    }
+
+    fn click_at(
+        &self,
+        window: &WindowInfo,
+        x: i32,
+        y: i32,
+        double: bool,
+        _lease: &InteractionLease,
+    ) -> Result<(), AdapterError> {
+        crate::actions::point_click::click_at(window, x, y, double)
+    }
 }
 impl InputOps for WindowsAdapter {
     fn mouse_event(

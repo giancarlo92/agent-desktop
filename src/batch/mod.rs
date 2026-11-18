@@ -89,6 +89,8 @@ pub(crate) fn parse_command(item: BatchCommand) -> Result<Commands, AppError> {
         "minimize" => decode(command, item.args).map(Commands::Minimize),
         "maximize" => decode(command, item.args).map(Commands::Maximize),
         "restore" => decode(command, item.args).map(Commands::Restore),
+        "menu" => decode(command, item.args).map(Commands::Menu),
+        "click-at" => decode(command, item.args).map(Commands::ClickAt),
         "list-surfaces" => decode(command, item.args).map(Commands::ListSurfaces),
         "open-system-surface" => decode(command, item.args).map(Commands::OpenSystemSurface),
         "list-notifications" => decode(command, item.args).map(Commands::ListNotifications),

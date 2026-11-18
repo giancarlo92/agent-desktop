@@ -230,7 +230,15 @@ mod imp {
         {
             return Ok(ActionResult::from_execution(&Action::Click, vec![step]));
         }
-        let steps = click_chain_judged_for(
+        // A tab its app draws itself: providers such as SWT's refuse its
+        // accessibility click, so it goes as window messages straight away.
+        if !policy.allow_focus_steal
+            && crate::actions::posted_click::is_drawn_tab(element)
+            && let Some(step) = crate::actions::posted_click::click(element)?
+        {
+            return Ok(ActionResult::from_execution(&Action::Click, vec![step]));
+        }
+        let chain = click_chain_judged_for(
             deadline,
             policy,
             ClickAvailability {
@@ -244,8 +252,24 @@ mod imp {
                 ))
             },
             || legacy_default_action(element),
-        )?;
-        Ok(ActionResult::from_execution(&Action::Click, steps))
+        );
+        match chain {
+            Ok(steps) => Ok(ActionResult::from_execution(&Action::Click, steps)),
+            // Refused before anything happened (the element "not enabled",
+            // no such action): the same click as window messages, which
+            // still never touch the person's mouse or bring the window forward.
+            Err(error)
+                if !policy.allow_focus_steal
+                    && error.disposition
+                        == agent_desktop_core::DeliverySemantics::not_delivered() =>
+            {
+                match crate::actions::posted_click::click(element)? {
+                    Some(step) => Ok(ActionResult::from_execution(&Action::Click, vec![step])),
+                    None => Err(error),
+                }
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub(crate) fn click_legacy_available(element: &UIAElement) -> bool {

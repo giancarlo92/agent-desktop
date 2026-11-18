@@ -28,9 +28,9 @@ use crate::cli_args::{
     skills::SkillsArgs,
     stroke::StrokeArgs,
     system::{
-        AppRefArgs, ClipboardGetArgs, ClipboardSetArgs, CloseAppArgs, FocusWindowArgs, LaunchArgs,
-        ListAppsArgs, ListWindowsArgs, MoveWindowCliArgs, OpenSystemSurfaceArgs, PermissionsArgs,
-        ResizeWindowCliArgs, WaitArgs,
+        AppRefArgs, ClickAtArgs, ClipboardGetArgs, ClipboardSetArgs, CloseAppArgs, FocusWindowArgs,
+        LaunchArgs, ListAppsArgs, ListWindowsArgs, MenuArgs, MoveWindowCliArgs,
+        OpenSystemSurfaceArgs, PermissionsArgs, ResizeWindowCliArgs, WaitArgs,
     },
     trace::TraceArgs,
 };
@@ -135,6 +135,14 @@ pub(crate) enum Commands {
     Maximize(AppRefArgs),
     #[command(about = "Restore minimized or maximized window")]
     Restore(AppRefArgs),
+    #[command(
+        about = "Run a command of a window's menu bar by its path (File, Save as...), without opening the menu or taking the focus"
+    )]
+    Menu(MenuArgs),
+    #[command(
+        about = "Click a point of a window, in pixels of its screenshot, for content not in the accessibility tree; never moves the cursor or takes the focus"
+    )]
+    ClickAt(ClickAtArgs),
     #[command(about = "List accessibility surfaces for an app (window, menu, sheet ...)")]
     ListSurfaces(ListSurfacesArgs),
     #[command(
@@ -250,6 +258,8 @@ impl Commands {
             Self::Minimize(_) => CommandMetadata::new("minimize", false),
             Self::Maximize(_) => CommandMetadata::new("maximize", false),
             Self::Restore(_) => CommandMetadata::new("restore", false),
+            Self::Menu(_) => CommandMetadata::new("menu", false),
+            Self::ClickAt(_) => CommandMetadata::new("click-at", false),
             Self::ListSurfaces(_) => CommandMetadata::new("list-surfaces", false),
             Self::OpenSystemSurface(_) => CommandMetadata::new("open-system-surface", false),
             Self::ListNotifications(_) => CommandMetadata::new("list-notifications", false),
@@ -322,6 +332,8 @@ impl Commands {
             | Self::Minimize(_)
             | Self::Maximize(_)
             | Self::Restore(_)
+            | Self::Menu(_)
+            | Self::ClickAt(_)
             | Self::DismissNotification(_)
             | Self::DismissAllNotifications(_)
             | Self::NotificationAction(_)

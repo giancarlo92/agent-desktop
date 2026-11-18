@@ -93,6 +93,21 @@ agent-desktop right-click @s8f3k2p9:e5
 - `double-click` and `triple-click` are physical gestures and fail closed headless. For raw coordinates use `--headed mouse-click --xy X,Y --count 2` (or `3`).
 - `right-click` opens the context menu. Then take `snapshot --surface menu`. Use `select` for combo boxes and menu buttons instead.
 - A right-click can return `APP_UNRESPONSIVE` with uncertain delivery after a modal menu opened. Look at the effect first. Do not retry.
+- When the app refuses the accessibility click before anything happened (`not_delivered`, such as `UIA_E_ELEMENTNOTENABLED`), `click` delivers it as window messages at the element instead: `data.steps` shows `WindowMessage.WM_LBUTTON`. Tabs an app draws itself (SWT: DBeaver, Eclipse) always go this way.
+
+### Menu bar and points with no element (Windows)
+
+```bash
+agent-desktop menu --window-id w-123 "SQL Editor" "Execute SQL query"   # run a menu-bar command
+agent-desktop menu --window-id w-123 Edit ?                             # read a menu: the error lists its items
+agent-desktop screenshot --window-id w-123 shot.png
+agent-desktop click-at --window-id w-123 1140 734                        # click the content at that pixel of shot.png
+agent-desktop click-at --window-id w-123 1140 734 --double
+```
+
+- `menu` works on classic menu bars (Win32 `HMENU`: SWT and Eclipse apps, Notepad, many older apps), which open only in the window in front. It sends the command the item stands for; the app is told the menu opened first, so menus it fills on opening are filled. A disabled item fails; a name it does not have fails with `details.items`. Apps whose menus are part of the window (Office ribbons, most modern apps) are in the accessibility tree: use `click`.
+- A menu command acts on what the app has active, like a keyboard shortcut would: check what that is (the window title, the selected tab) before a command such as Execute or Delete.
+- `click-at` takes pixels of the window's screenshot (from its top-left corner). It clicks the innermost child window under that point with posted messages: the cursor does not move and the window does not come forward. Use it for content with no element: a results grid, a canvas, a chart. Read the result with another `screenshot`.
 
 ## Text input
 

@@ -37,6 +37,13 @@ fn a_profile_directory_of_its_own_makes_a_separate_instance() {
         "about:blank"
     ])));
     assert!(!has_own_profile(&args(&["--new-window", "about:blank"])));
+    assert!(has_own_profile(&args(&[
+        "-data",
+        "C:/bot/workspace",
+        "-nosplash"
+    ])));
+    assert!(!has_own_profile(&args(&["-data", "-nosplash"])));
+    assert!(!has_own_profile(&args(&["-data"])));
 }
 
 #[test]
