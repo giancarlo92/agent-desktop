@@ -172,13 +172,25 @@ pub(crate) struct ClickAtArgs {
     #[command(flatten)]
     #[serde(flatten)]
     pub scope: WindowScope,
-    #[arg(help = "Pixels from the left edge of the window's screenshot")]
+    #[arg(
+        allow_negative_numbers = true,
+        help = "Pixels from the left edge of the window's screenshot"
+    )]
     pub x: i32,
-    #[arg(help = "Pixels from the top edge of the window's screenshot")]
+    #[arg(
+        allow_negative_numbers = true,
+        help = "Pixels from the top edge of the window's screenshot"
+    )]
     pub y: i32,
     #[arg(long, help = "Double-click instead of a single click")]
     #[serde(default)]
     pub double: bool,
+    #[arg(
+        long,
+        help = "x and y are screen pixels (as element bounds are), not pixels of the screenshot"
+    )]
+    #[serde(default)]
+    pub screen: bool,
 }
 
 #[derive(Parser, Debug, Deserialize)]

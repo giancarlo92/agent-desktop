@@ -167,6 +167,11 @@ export class Element {
     return data.text ?? data.value ?? '';
   }
 
+  /** Where the element is on screen: { x, y, width, height }. */
+  async bounds() {
+    return (await run('get', this.ref, '--property', 'bounds')).value;
+  }
+
   /** visible, enabled, checked, focused, expanded or selected. */
   async is(state) {
     const data = await run('is', this.ref, '--property', state);
@@ -185,7 +190,7 @@ export class Window {
   }
 
   #findArgs(query) {
-    const args = ['find', '--window-id', this.id, '--first'];
+    const args = ['find', '--window-id', this.id, ...(query.within ? [] : ['--first'])];
     if (this.app_name) args.push('--app', this.app_name);
     if (query.nativeId) args.push('--native-id', query.nativeId);
     if (query.role) args.push('--role', query.role);
@@ -201,10 +206,21 @@ export class Window {
    */
   async find(query, { timeoutMs = 15000 } = {}) {
     const ref = await until(timeoutMs, async () => {
-      const match = (await run(...this.#findArgs(query))).match;
+      const match = await this.#match(query, (found) => found.ref_id);
       return match && match.ref_id;
     }, () => `No ${describe(query)} in ${this}`);
     return new Element(this, query, ref);
+  }
+
+  /**
+   * The first match, or with `query.within` the first one inside an element whose name contains that
+   * text (a tab, a panel, a dialog): `{ role: 'textfield', within: '<PRV Staging> Script-3' }`.
+   */
+  async #match(query, usable) {
+    const data = await run(...this.#findArgs(query));
+    if (!query.within) return data.match;
+    return (data.matches || []).find((found) => usable(found)
+      && (found.path || []).some((step) => step.includes(query.within)));
   }
 
   /**
@@ -213,10 +229,31 @@ export class Window {
    */
   async read(query, { timeoutMs = 15000 } = {}) {
     const match = await until(timeoutMs, async () => {
-      const found = (await run(...this.#findArgs(query))).match;
+      const found = await this.#match(query, (item) => item.value || item.name);
       return found && (found.value || found.name) ? found : null;
     }, () => `No ${describe(query)} in ${this}`);
     return match.value || match.name;
+  }
+
+  /**
+   * Where an element is on screen, { x, y, width, height }, also for one you cannot act on (a panel,
+   * a group): to click next to it with `clickAt(..., { screen: true })`.
+   */
+  async boundsOf(query, { timeoutMs = 15000 } = {}) {
+    const match = await until(timeoutMs, () => this.#match(query, (item) => item.bounds),
+      () => `No ${describe(query)} in ${this}`);
+    return match.bounds;
+  }
+
+  /**
+   * Waits until a text that is only read is there and differs from `before`: a status line that an
+   * earlier run already left, such as "10 row(s) fetched ... at 23:10".
+   */
+  async waitForNew(query, before, { timeoutMs = 60000 } = {}) {
+    return until(timeoutMs, async () => {
+      const now = await this.read(query, { timeoutMs: 1000 }).catch(() => null);
+      return now && now !== before ? now : null;
+    }, () => `${describe(query)} in ${this} did not change`);
   }
 
   /** Whether an element is there now, without waiting long: for a dialog that only sometimes appears. */
@@ -239,9 +276,48 @@ export class Window {
     }
   }
 
+  /**
+   * Runs a command of this window's menu bar by its path, without opening the menu (a menu bar only
+   * opens in the window in front): `await win.menu('SQL Editor', 'Execute SQL query')`.
+   */
+  async menu(...path) {
+    return run('menu', '--window-id', this.id, ...path);
+  }
+
+  /**
+   * Clicks content that has no element (a results grid, a canvas) without moving the cursor: at
+   * pixels of this window's screenshot, or with `screen: true` at screen pixels, as an element's
+   * `bounds()` gives them (so a point next to an element survives a window of another size).
+   * `double: true` double-clicks.
+   */
+  async clickAt(x, y, { double = false, screen = false } = {}) {
+    return run('click-at', '--window-id', this.id, Math.round(x), Math.round(y),
+      ...(double ? ['--double'] : []), ...(screen ? ['--screen'] : []));
+  }
+
+  /** Saves a PNG of this window, even behind others. */
+  async screenshot(file) {
+    return run('screenshot', '--window-id', this.id, file);
+  }
+
+  /** The window's title now (it often names the open document, tab or connection). */
+  async currentTitle() {
+    const windows = await run('list-windows');
+    const now = windows.find((w) => w.id === this.id);
+    if (!now) throw new ScriptError(`${this} is closed`);
+    this.title = now.title;
+    return now.title;
+  }
+
   async close() {
     return run('close-window', this.id).catch(() => null);
   }
+}
+
+/** The text on the clipboard (what the app copied). */
+export async function readClipboard() {
+  const data = await run('clipboard-get');
+  return data.text ?? '';
 }
 
 /** A window whose title contains `title` (and of `app`, or of the process `pid`), waiting until it is there. */
@@ -250,6 +326,13 @@ export async function findWindow(title, { app, pid, timeoutMs = 30000 } = {}) {
     const windows = await run('list-windows', ...(app ? ['--app', app] : []));
     return windows.find((w) => (!title || (w.title || '').includes(title)) && (!pid || w.pid === pid));
   }, () => `No window titled "${title}"${app ? ` of ${app}` : ''}`);
+  if (info.minimized) {
+    // A minimized window shows no elements; restore shows it again without bringing it forward.
+    await run('restore', '--window-id', info.id);
+    await sleep(500);
+    const shown = (await run('list-windows')).find((w) => w.id === info.id);
+    if (shown) Object.assign(info, shown);
+  }
   return new Window(info);
 }
 
@@ -417,7 +500,7 @@ export async function task({ title = 'Task', params: spec = {} }, body) {
   };
 
   try {
-    const result = await body({ params, step, confirm, run, findWindow, openApp, openBrowser });
+    const result = await body({ params, step, confirm, run, findWindow, openApp, openBrowser, readClipboard });
     // A finished task closes the browser it opened; --keep-open leaves it to look at.
     if (!given.keep_open) closeOpened();
     console.log(result ? `Done: ${result}` : 'Done.');

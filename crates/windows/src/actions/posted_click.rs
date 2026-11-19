@@ -18,7 +18,9 @@ use uiautomation::patterns::UISelectionItemPattern;
 use uiautomation::types::ControlType;
 use windows::Win32::Foundation::HWND;
 use windows_sys::Win32::Foundation::{POINT, RECT};
-use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
+use windows_sys::Win32::Graphics::Gdi::{
+    GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, ScreenToClient,
+};
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::IsWindowEnabled;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -91,10 +93,11 @@ fn own_window(element: &UIAElement) -> Option<isize> {
 /// one), shown and enabled, when its client area holds the element's center,
 /// with that point in its client coordinates.
 ///
-/// Some providers (SWT's tabs) report bounds without the display scaling (at
-/// 125 % they are 1/1.25 of the real position) while their windows are
-/// scaled. The scaled center is tried first, then the center as reported; the
-/// point must fall in the nearest window, never one further out.
+/// Some providers (SWT's tabs) report bounds without the display scaling,
+/// counted from the corner of the display the window is on (at 125 % a tab
+/// 500 px into that display reads as 400 px in), while their windows are
+/// scaled. The point scaled from that corner is tried first, then the center
+/// as reported; it must fall in the nearest window, never one further out.
 fn holding_window(element: &UIAElement, center: POINT) -> Option<(isize, POINT)> {
     let walker = automation_client().ok()?.get_control_view_walker().ok()?;
     let mut windows: Vec<isize> = own_window(element).into_iter().collect();
@@ -117,9 +120,13 @@ fn holding_window(element: &UIAElement, center: POINT) -> Option<(isize, POINT)>
     let scale = unsafe { GetDpiForWindow(nearest as _) };
     let mut candidates = Vec::with_capacity(2);
     if scale > USER_DEFAULT_SCREEN_DPI {
+        let origin = display_origin(nearest);
+        let grow = |value: i32, from: i32| {
+            from + ((value - from) as i64 * scale as i64 / USER_DEFAULT_SCREEN_DPI as i64) as i32
+        };
         candidates.push(POINT {
-            x: (center.x as i64 * scale as i64 / USER_DEFAULT_SCREEN_DPI as i64) as i32,
-            y: (center.y as i64 * scale as i64 / USER_DEFAULT_SCREEN_DPI as i64) as i32,
+            x: grow(center.x, origin.x),
+            y: grow(center.y, origin.y),
         });
     }
     candidates.push(center);
@@ -129,6 +136,20 @@ fn holding_window(element: &UIAElement, center: POINT) -> Option<(isize, POINT)>
     let usable =
         unsafe { IsWindowVisible(nearest as _) != 0 && IsWindowEnabled(nearest as _) != 0 };
     usable.then_some((nearest, point))
+}
+
+/// The top-left corner of the display `hwnd` is on, in screen pixels.
+fn display_origin(hwnd: isize) -> POINT {
+    let monitor = unsafe { MonitorFromWindow(hwnd as _, MONITOR_DEFAULTTONEAREST) };
+    let mut info: MONITORINFO = unsafe { std::mem::zeroed() };
+    info.cbSize = size_of::<MONITORINFO>() as u32;
+    if monitor.is_null() || unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+        return POINT { x: 0, y: 0 };
+    }
+    POINT {
+        x: info.rcMonitor.left,
+        y: info.rcMonitor.top,
+    }
 }
 
 /// `screen` in `hwnd`'s client coordinates, when it falls inside its client area.

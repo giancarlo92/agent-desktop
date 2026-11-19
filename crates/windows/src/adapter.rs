@@ -246,12 +246,10 @@ impl ActionOps for WindowsAdapter {
     fn click_at(
         &self,
         window: &WindowInfo,
-        x: i32,
-        y: i32,
-        double: bool,
+        point: &agent_desktop_core::PointClick,
         _lease: &InteractionLease,
     ) -> Result<(), AdapterError> {
-        crate::actions::point_click::click_at(window, x, y, double)
+        crate::actions::point_click::click_at(window, point)
     }
 }
 impl InputOps for WindowsAdapter {

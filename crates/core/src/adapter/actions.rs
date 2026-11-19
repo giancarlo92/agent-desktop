@@ -3,6 +3,16 @@ use crate::{
     actions::action_result::ActionResult, adapter::native_handle::NativeHandle,
 };
 
+/// A click at a point of a window: in pixels of the window's screenshot, or,
+/// with `screen`, in screen pixels (as element bounds are).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PointClick {
+    pub x: i32,
+    pub y: i32,
+    pub double: bool,
+    pub screen: bool,
+}
+
 pub trait ActionOps: Send + Sync {
     fn headed_requirement_for_ref(
         &self,
@@ -52,14 +62,12 @@ pub trait ActionOps: Send + Sync {
         Err(AdapterError::not_supported("invoke_menu"))
     }
 
-    /// Clicks (or double-clicks) a point of `window`, in pixels of its
-    /// screenshot, without moving the cursor or taking the focus.
+    /// Clicks (or double-clicks) a point of `window` without moving the cursor
+    /// or taking the focus.
     fn click_at(
         &self,
         _window: &crate::WindowInfo,
-        _x: i32,
-        _y: i32,
-        _double: bool,
+        _point: &PointClick,
         _lease: &InteractionLease,
     ) -> Result<(), AdapterError> {
         Err(AdapterError::not_supported("click_at"))

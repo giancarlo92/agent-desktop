@@ -169,6 +169,7 @@ pub(super) fn click_at(
             x: args.x,
             y: args.y,
             double: args.double,
+            screen: args.screen,
         },
         adapter,
     )

@@ -7,7 +7,7 @@
 //! click sends are posted to that window. The cursor does not move, the
 //! person's input is not used and posted messages never activate a window.
 
-use agent_desktop_core::{AdapterError, ErrorCode, WindowInfo};
+use agent_desktop_core::{AdapterError, ErrorCode, PointClick, WindowInfo};
 use windows_sys::Win32::Foundation::{POINT, RECT};
 use windows_sys::Win32::Graphics::Dwm::{DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
 use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
@@ -19,14 +19,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 const MK_LBUTTON: usize = 0x0001;
 const MAX_DEPTH: usize = 32;
 
-/// Clicks (or double-clicks) `window` at `x`, `y`: pixels from the top-left
-/// corner of its screenshot.
-pub(crate) fn click_at(
-    window: &WindowInfo,
-    x: i32,
-    y: i32,
-    double: bool,
-) -> Result<(), AdapterError> {
+/// Clicks (or double-clicks) `window` at a point: pixels from the top-left
+/// corner of its screenshot, or screen pixels with `point.screen`.
+pub(crate) fn click_at(window: &WindowInfo, point: &PointClick) -> Result<(), AdapterError> {
+    let double = point.double;
     let top = crate::system::window::window_ops::parse_window_id(&window.id)?;
     let frame = frame(top).ok_or_else(|| {
         AdapterError::new(
@@ -34,6 +30,11 @@ pub(crate) fn click_at(
             "The window's position could not be read",
         )
     })?;
+    let (x, y) = if point.screen {
+        (point.x - frame.left, point.y - frame.top)
+    } else {
+        (point.x, point.y)
+    };
     if x < 0 || y < 0 || x >= frame.right - frame.left || y >= frame.bottom - frame.top {
         return Err(AdapterError::new(
             ErrorCode::InvalidArgs,

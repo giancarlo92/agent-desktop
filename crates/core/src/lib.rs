@@ -34,7 +34,7 @@ pub use actions::interaction_policy::InteractionPolicy;
 pub use actions::post_action::execute_verified_action;
 pub use actions::step_mechanism::StepMechanism;
 pub use adapter::PlatformAdapter;
-pub use adapter::actions::ActionOps;
+pub use adapter::actions::{ActionOps, PointClick};
 pub use adapter::adapter_session::AdapterSession;
 pub use adapter::hit_test::HitTestResult;
 pub use adapter::input::{InputOps, RecordSink};

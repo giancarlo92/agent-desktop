@@ -13,6 +13,7 @@ pub struct ClickAtArgs {
     pub x: i32,
     pub y: i32,
     pub double: bool,
+    pub screen: bool,
 }
 
 pub fn execute(args: ClickAtArgs, adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
@@ -22,7 +23,13 @@ pub fn execute(args: ClickAtArgs, adapter: &dyn PlatformAdapter) -> Result<Value
         adapter,
     )?;
     let lease = adapter.acquire_interaction_lease(crate::Deadline::standard()?)?;
-    adapter.click_at(&window, args.x, args.y, args.double, &lease)?;
+    let point = crate::PointClick {
+        x: args.x,
+        y: args.y,
+        double: args.double,
+        screen: args.screen,
+    };
+    adapter.click_at(&window, &point, &lease)?;
     Ok(
         json!({ "window": window.id, "x": args.x, "y": args.y, "double": args.double, "sent": true }),
     )

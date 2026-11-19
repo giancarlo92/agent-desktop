@@ -4,23 +4,35 @@ tags: automation-script, rpa, record-and-replay, desktop-automation, ai-agent
 requirements:
   - agent-desktop
 description: >
-  Turn a recording of a person's task (agent-desktop record) into a script that repeats it
-  without AI, in the background, with the values that change as parameters and saved passwords
-  filled by name. JavaScript by default; any language the person asks for (Python, Go,
-  PowerShell...). Use when the person wants to automate a task they recorded or showed you,
-  make it repeatable, turn steps into a script, or run it again with other data.
-  Triggers on: "turn the recording into a script", "convierte la grabación en script",
-  "automate this task", "make a script from what I did", "repeat this every day",
-  "the customer and the amount change every time", "write it in Python".
-  When such a script later fails, use the script-repair skill.
+  ALWAYS use this skill before writing any script, bot or automation that repeats a task done in
+  a desktop app or a web page: a task you just did in this conversation with the desktop tools
+  (agent-desktop, desktop-recorder), a task the person recorded (agent-desktop record), or one
+  they describe. The script repeats the same steps in the same app, without AI and in the
+  background, with the values that change as parameters and passwords filled by name.
+  JavaScript by default; any language the person asks for (Python, Go, PowerShell...).
+  Triggers on: "create a script for this", "crea un script", "crea un script para replicar esto",
+  "hazme un script", "automate this", "automatiza esto", "make it repeatable", "hazlo repetible",
+  "repeat this every day", "que se ejecute solo", "turn the recording into a script",
+  "convierte la grabación en script", "make a bot of this", "the customer and the amount change
+  every time", "write it in Python". When such a script later fails, use script-repair.
 ---
 <!-- Part of the desktop-recorder-mcp fork of agent-desktop (see NOTICE). -->
 
-# From a recording to a script
+# A script that repeats a task
 
-A person recorded a task (see the `desktop-recording` skill) and wants it to run again without doing it by hand. You write a script that repeats it with agent-desktop commands and no AI. The script opens what the task needs, finds each element by what it is (not by where it was on the screen), does the same actions and checks each one worked. It stops with a clear message when something is not as expected. It runs in the background: the person keeps using their computer meanwhile.
+The person wants a task done in a desktop app or web page to run again without doing it by hand, and without AI. You write a script that repeats it with agent-desktop commands. The script opens what the task needs, finds each element by what it is (not by where it was on the screen), does the same actions and checks each one worked. It stops with a clear message when something is not as expected. It runs in the background: the person keeps using their computer meanwhile.
 
-The script replays the task as it was recorded. When the app or page changes, it stops at the step that no longer matches: then follow the `script-repair` skill.
+The script repeats the task as it was done. When the app or page changes, it stops at the step that no longer matches: then follow the `script-repair` skill.
+
+## Where the steps come from
+
+- **A task you just did in this conversation** ("now make a script to replicate this"): your own successful desktop tool calls are the steps, in order. Leave out the attempts that failed, the reads you only made to look around (snapshots, screenshots, finds), and anything you would not need again. Keep how you found each element (its window, role and name or id), never a ref: refs belong to one snapshot.
+- **A recording** (`record`, see the `desktop-recording` skill): read it as section 1 says.
+- **A task the person describes**: do it once with the desktop tools, or walk through it with them, then write the steps.
+
+## Follow the same path through the app
+
+The script goes the way the task went: the same app, the same screens, the same menus and buttons. The app already holds what the task needs (its saved connections and sessions, the person's login, its settings), so a script that drives the app needs no user name, password or connection string. Do not replace the app with another route (a direct database connection, an API, a file the app reads) unless the person asks for that route. Never read, copy or decrypt credentials an app stored for itself (DBeaver's `credentials-config.json`, a browser's saved passwords): when a step needs a password the app does not fill in itself, use `secret fill`.
 
 ## 1. Read the recording
 
@@ -92,11 +104,12 @@ These were tested on real forms, a password prompt and a desktop app, with a per
 | `type` with `secure: true` | `secret fill` the field with the secret's name |
 | `type` into a grid cell or canvas editor | select the cell (`select` or `click`), then `set-value` the cell or its editor; a grid that only accepts typing is written through the app's automation (COM for Excel) or its file |
 | `select` | `select` the list with the option's text (or value) |
-| `press` (`return`, `ctrl+s`, `tab`) | `click` the button or menu item that does the same (Save, OK, Send, Submit, Execute); with none, do it through the app's automation or command line |
+| `press` (`return`, `ctrl+s`, `ctrl+enter`) | `click` the button that does the same (Save, OK, Send, Submit), or run the menu-bar command with `menu` (`menu --window-id <id> "SQL Editor" "Execute SQL query"`) |
+| a menu-bar item | `menu --window-id <id> <item> <item>`: it runs without opening the menu |
 | `scroll` | usually nothing: `find` reaches elements out of view; `scroll-to` if one must be visible |
 | `drag` that selected cells or text | select the same range with `select` |
-| `drag` on a canvas, or a click with no name at all | find the element in a fresh `snapshot` (it often has a name or id there), or reach the same result through the app's automation, its files or a command |
-| copy (`ctrl+c`) with `clipboard` | read the source (`get`, or the `find` match) and `set-value` it where it goes |
+| a click on content with no element (a results grid, a canvas) | `click-at --window-id <id> <x> <y>` at pixels of the window's screenshot; in a script, work the point out from an element next to it (its `bounds` minus the window's position) rather than fixed pixels, so it survives a window of another size |
+| copy (`ctrl+c`) with `clipboard` | the app's own Copy (`menu ... Edit Copy`), then read the clipboard (`clipboard-get`) and write it where it goes, as it is; or read the source (`get`, the `find` match) |
 
 ## 7. JavaScript (the default)
 
@@ -149,12 +162,71 @@ What `desktop-script.mjs` gives:
 | `openApp(program, { title, args })` | `launch`, then its window |
 | `openBrowser(url, { title, profile, browser })` | Chrome (or Edge) with a profile of the script's own and DevTools; closed when the task finishes (`--keep-open` keeps it) |
 | `findWindow(title, { app, pid })` | A window already open |
-| `window.find(query)` | An element to act on, waiting for it. `query`: `nativeId`, `role`, `name`, `text`, `exact` |
+| `window.find(query)` | An element to act on, waiting for it. `query`: `nativeId`, `role`, `name`, `text`, `exact`, and `within` (only inside an element whose name contains that text: a tab, a panel, a dialog) |
+| `window.boundsOf(query)` | Where any element is on screen, also one you cannot act on (a panel) |
+| `window.waitForNew(query, before)` | Waits until a text that is only read differs from what it was (a status line an earlier run left) |
 | `window.read(query)` | The text of an element that is only read |
 | `window.has(query)` | The element if it is there now, else `null`: for a dialog that only sometimes appears |
 | `window.waitForText(text)` | Waits until the window shows it |
-| `element.click()`, `.setValue(v)`, `.clear()`, `.select(option)`, `.check()`, `.uncheck()`, `.fillSecret(name)`, `.value()`, `.is(state)` | The actions, each checked |
+| `window.menu(...path)` | A menu-bar command, without opening the menu |
+| `window.clickAt(x, y, { double, screen })` | A click on content with no element: at pixels of the window's screenshot, or with `screen: true` at screen pixels (as `boundsOf` gives them) |
+| `findWindow(title, { app, pid })` restores a minimized window | A minimized window shows no elements; it is shown again without coming forward |
+| `window.screenshot(file)`, `window.currentTitle()` | A PNG of the window (even behind others); its title now |
+| `readClipboard()` | The text the app copied |
+| `element.click()`, `.setValue(v)`, `.clear()`, `.select(option)`, `.check()`, `.uncheck()`, `.fillSecret(name)`, `.value()`, `.is(state)`, `.bounds()` | The actions, each checked; where the element is |
 | `run(...args)` | Any other agent-desktop command; returns `data` or throws |
+
+A desktop app driven through its menus, the way a task done in DBeaver goes (the connection is the one the app already has, so the script needs no login):
+
+```js
+// export-rows.mjs: node export-rows.mjs --connection "PRV Staging" --table alumno --out C:\Users\me\Desktop\alumno.txt
+import { task } from './desktop-script.mjs';
+import { writeFileSync } from 'node:fs';
+
+await task({
+  title: 'Copy the first rows of a table from DBeaver into a text file',
+  params: {
+    connection: { ask: 'The DBeaver connection', example: 'PRV Staging' },
+    table: { ask: 'The table', example: 'alumno' },
+    rows: { ask: 'How many rows', default: '10' },
+    out: { ask: 'The text file to write', example: 'C:\\Users\\me\\Desktop\\alumno.txt' },
+  },
+}, async ({ params, step, findWindow, readClipboard }) => {
+  let app, editor;
+  await step(1, 'Find DBeaver', async () => {
+    app = await findWindow('DBeaver', { app: 'dbeaver.exe' });   // restored if it was minimized
+  });
+  await step(2, `Select the connection ${params.connection}`, async () => {
+    await (await app.find({ role: 'treeitem', name: params.connection, exact: true })).select(params.connection);
+  });
+  await step(3, 'Open a new SQL script for it', async () => {
+    await app.menu('SQL Editor', 'New SQL script');
+    await new Promise((done) => setTimeout(done, 1500));
+    const title = await app.currentTitle();
+    // Never run anything on another connection: the title names the script's connection.
+    if (!title.includes(`<${params.connection}>`)) throw new Error(`the new script is not on ${params.connection}: ${title}`);
+    editor = await app.find({ role: 'textfield', within: title.split(' - ').pop() });
+  });
+  await step(4, 'Write and run the query', async () => {
+    const status = { role: 'statictext', text: 'row(s) fetched' };
+    const before = await app.read(status, { timeoutMs: 1000 }).catch(() => '');
+    await editor.setValue(`SELECT TOP ${params.rows} * FROM ${params.table};`);
+    await app.menu('SQL Editor', 'Execute SQL query');
+    await app.waitForNew(status, before);   // not the status an earlier run left
+  });
+  await step(5, 'Copy the whole result and write it as it is', async () => {
+    // The results panel; the grid's top-left corner is 50 px in and 84 px down from its corner,
+    // and a click there selects every cell.
+    const at = await app.boundsOf({ role: 'tablist', name: `${params.table} 1`, exact: true });
+    await app.clickAt(at.x + 50, at.y + 84, { screen: true });
+    await app.menu('Edit', 'Copy');
+    writeFileSync(params.out, await readClipboard());
+  });
+  return params.out;
+});
+```
+
+This script was run as it is against DBeaver 26 (SQL Server connection, two displays at 125 %): the file it writes is byte for byte what DBeaver's own Copy gives. Work out every point like the one in step 5 on a screenshot while you write the script, from an element next to it (`boundsOf`) rather than fixed pixels, and run the script once before handing it over.
 
 The person runs it with `node create-account.mjs --full-name "..." --country Peru`, and `node create-account.mjs --help` lists what it asks for.
 
